@@ -152,13 +152,17 @@ class ObserverTest:
             logger.error(f"Error setting up observer system: {str(e)}")
             return False
     
-    def setup_observer(self) -> bool:
-        """Set up the Observer."""
+    async def setup_observer_async(self) -> bool:
+        """Set up the Observer asynchronously."""
         if not self.supabase_client:
             logger.error("Cannot set up observer: Supabase client not initialized")
             return False
         
         try:
+            # Log supabase client type for debugging
+            logger.info(f"Supabase client type: {type(self.supabase_client)}")
+            
+            # Create the Observer
             self.observer = Observer(
                 supabase_client=self.supabase_client,
                 observer_manager=self.observer_manager,
@@ -167,12 +171,29 @@ class ObserverTest:
                 vault_info_table='abs_vault_info'
             )
             
-            self.observer.start()
+            # Use the async start method directly
+            await self.observer.start_async()
             self.is_listening = True
             logger.info("Observer started successfully")
             return True
         except Exception as e:
             logger.error(f"Failed to set up Observer: {str(e)}")
+            return False
+    
+    def setup_observer(self) -> bool:
+        """Set up the Observer (synchronous wrapper)."""
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                future = asyncio.run_coroutine_threadsafe(self.setup_observer_async(), new_loop)
+                return future.result()
+            else:
+                return loop.run_until_complete(self.setup_observer_async())
+        except Exception as e:
+            logger.error(f"Error in setup_observer: {str(e)}")
             return False
     
     def manually_trigger_event(self, observable_name: str, event_type: str, event_data: Dict[str, Any]) -> None:
@@ -228,11 +249,11 @@ class ObserverTest:
         finally:
             self.cleanup()
     
-    def cleanup(self) -> None:
-        """Clean up resources."""
+    async def cleanup_async(self) -> None:
+        """Clean up resources asynchronously."""
         if self.observer and self.is_listening:
             try:
-                self.observer.stop()
+                await self.observer.stop_async()
                 self.is_listening = False
                 logger.info("Observer stopped")
             except Exception as e:
@@ -247,9 +268,29 @@ class ObserverTest:
             for event_type in self.test_observer.event_counts.keys():
                 if self.test_observer.get_event_count(event_type) > 0:
                     self.test_observer.print_event_details(event_type=event_type)
+    
+    def cleanup(self) -> None:
+        """Clean up resources (synchronous wrapper)."""
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                future = asyncio.run_coroutine_threadsafe(self.cleanup_async(), new_loop)
+                future.result()
+            else:
+                loop.run_until_complete(self.cleanup_async())
+        except Exception as e:
+            logger.error(f"Error in cleanup: {str(e)}")
+            
+            # Print final event summary in case of error
+            if self.test_observer.get_event_count() > 0:
+                print("\n=== Final Event Summary (after error) ===")
+                self.test_observer.print_event_summary()
 
-def main():
-    """Main function."""
+async def async_main():
+    """Async main function."""
     parser = argparse.ArgumentParser(description='Test the Observer with TestObserver')
     
     parser.add_argument('--url', required=True,
@@ -286,8 +327,8 @@ def main():
             logger.error("Failed to set up observer system, exiting")
             return 1
         
-        # Set up Observer
-        if not test.setup_observer():
+        # Set up Observer asynchronously
+        if not await test.setup_observer_async():
             logger.error("Failed to set up Observer, exiting")
             return 1
         
@@ -301,6 +342,15 @@ def main():
     finally:
         # Ensure resources are cleaned up
         test.cleanup()
+
+def main():
+    """Main function that runs the async_main function."""
+    try:
+        import asyncio
+        return asyncio.run(async_main())
+    except Exception as e:
+        logger.error(f"Unhandled exception in main: {str(e)}")
+        return 1
 
 if __name__ == '__main__':
     sys.exit(main()) 

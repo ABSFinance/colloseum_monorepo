@@ -17,6 +17,9 @@ from typing import Dict, Any, List, Optional
 import uuid
 import asyncio
 
+# Import the Supabase client module
+from supabase import create_async_client, AsyncClient
+
 # Add the parent directory to the Python path to allow importing from the core module
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
@@ -69,32 +72,16 @@ class ObserverDBTest:
         
         logger.info("ObserverDBTest initialized")
     
-    def connect_to_supabase(self):
+    async def connect_to_supabase(self):
         """Connect to Supabase and initialize the client."""
         try:
-            # Import the Supabase client module
-            from supabase import create_async_client
             
             # Create a client with realtime enabled
-            self.supabase_client = create_async_client(
+            self.supabase_client : AsyncClient = await create_async_client(
                 self.supabase_url, 
                 self.supabase_key,
-                options={
-                    "realtime": {
-                        "enabled": True
-                    },
-                }
             )
-
-            logger.info(f"Supabase client type: {type(self.supabase_client)}")
-            logger.info(f"Supabase client attributes and methods: {dir(self.supabase_client)}")
-
-            
-            # Check if the client has the necessary channel method for realtime
-            if not hasattr(self.supabase_client, 'channel'):
-                logger.error("Supabase client does not have 'channel' method for realtime functionality")
-                logger.error("Make sure you're using supabase-py>=2.0.0 and have properly configured the client")
-                return False
+        
                 
             logger.info("Connected to Supabase successfully with realtime-capable client")
             return True
@@ -152,7 +139,7 @@ class ObserverDBTest:
         """
         self.test_pools = []
         for i in range(num_pools):
-            pool_id = f"test_pool_{i}_{str(uuid.uuid4())[:8]}"
+            pool_id = 2000
             self.test_pools.append(pool_id)
         
         logger.info(f"Generated {num_pools} test pools: {self.test_pools}")
@@ -172,7 +159,7 @@ class ObserverDBTest:
                 timestamp = now - timedelta(hours=i)
                 record = {
                     'pool_id': pool_id,
-                    'timestamp': timestamp.isoformat(),
+                    'created_at': timestamp.isoformat(),
                     'apy': 0.05 + (i * 0.01),  # Slightly different APY values
                     'tvl': 1000000.0 - (i * 50000.0),  # Slightly different TVL values
                 }
@@ -186,7 +173,7 @@ class ObserverDBTest:
                 'allocated_pool_id': pool_id,  # Same pool ID for deposit
                 'amount': 5000.0,
                 'status': 'completed',
-                'timestamp': (now - timedelta(minutes=30)).isoformat(),
+                'created_at': (now - timedelta(minutes=30)).isoformat(),
             }
             self.test_records['abs_vault_allocation_history'].append(deposit_record)
             
@@ -196,7 +183,7 @@ class ObserverDBTest:
                 'allocated_pool_id': pool_id,  # Same pool ID for withdrawal
                 'amount': -2000.0,
                 'status': 'pending',
-                'timestamp': now.isoformat(),
+                'created_at': now.isoformat(),
             }
             self.test_records['abs_vault_allocation_history'].append(withdrawal_record)
             
@@ -204,17 +191,15 @@ class ObserverDBTest:
         for pool_id in self.test_pools:
             vault_record = {
                 'pool_id': pool_id,
-                'strategy': 'BALANCED',
+                'strategy': 'A',
                 'allowed_pools': self.test_pools,  # All pools allowed
                 'updated_at': now.isoformat(),
                 'created_at': (now - timedelta(days=1)).isoformat(),
             }
             self.test_records['abs_vault_info'].append(vault_record)
-        
-        logger.info(f"Generated test data: {json.dumps(self.test_records, indent=2, default=str)}")
-    
-    def insert_test_data(self, table_name: str, record: Dict[str, Any]) -> bool:
-        """Insert a test record into the specified table.
+
+    async def insert_test_data(self, table_name: str, record: Dict[str, Any]) -> bool:
+        """Insert a test record into the specified table asynchronously.
         
         Args:
             table_name: Name of the table to insert into
@@ -226,25 +211,7 @@ class ObserverDBTest:
         if not self.supabase_client:
             logger.error(f"Cannot insert data: Supabase client not initialized")
             return False
-        
-        try:
-            # Create an event loop for async operations
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Create a new event loop if the current one is already running
-                new_loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(new_loop)
-                future = asyncio.run_coroutine_threadsafe(self._async_insert_test_data(table_name, record), new_loop)
-                return future.result()  # Wait for the result
-            else:
-                # Use the current event loop
-                return loop.run_until_complete(self._async_insert_test_data(table_name, record))
-        except Exception as e:
-            logger.error(f"Error inserting into {table_name}: {str(e)}")
-            return False
-    
-    async def _async_insert_test_data(self, table_name: str, record: Dict[str, Any]) -> bool:
-        """Async version of insert_test_data for async Supabase client."""
+
         try:
             response = await self.supabase_client.table(table_name).insert(record).execute()
             data = response.data
@@ -281,7 +248,7 @@ class ObserverDBTest:
         except Exception as e:
             logger.error(f"Error triggering event {event_type}: {str(e)}")
 
-    def run_test_sequence(self, delay_between_inserts: float = 2.0, cleanup_after_test: bool = True):
+    async def run_test_sequence(self, delay_between_inserts: float = 2.0, cleanup_after_test: bool = True):
         """Run a test sequence by inserting test data and monitoring events.
         
         Args:
@@ -301,24 +268,24 @@ class ObserverDBTest:
             # Insert performance history records
             for i, record in enumerate(self.test_records['performance_history']):
                 logger.info(f"Inserting performance history record {i+1}/{len(self.test_records['performance_history'])}")
-                self.insert_test_data('performance_history', record)
-                time.sleep(delay_between_inserts)  # Wait for events to propagate
+                await self.insert_test_data('performance_history', record)
+                await asyncio.sleep(delay_between_inserts)  # Wait for events to propagate using asyncio.sleep
             
             # Insert allocation history records
             for i, record in enumerate(self.test_records['abs_vault_allocation_history']):
                 logger.info(f"Inserting allocation history record {i+1}/{len(self.test_records['abs_vault_allocation_history'])}")
-                self.insert_test_data('abs_vault_allocation_history', record)
-                time.sleep(delay_between_inserts)  # Wait for events to propagate
+                await self.insert_test_data('abs_vault_allocation_history', record)
+                await asyncio.sleep(delay_between_inserts)  # Wait for events to propagate using asyncio.sleep
             
             # Insert vault info records
             for i, record in enumerate(self.test_records['abs_vault_info']):
                 logger.info(f"Inserting vault info record {i+1}/{len(self.test_records['abs_vault_info'])}")
-                self.insert_test_data('abs_vault_info', record)
-                time.sleep(delay_between_inserts)  # Wait for events to propagate
+                await self.insert_test_data('abs_vault_info', record)
+                await asyncio.sleep(delay_between_inserts)  # Wait for events to propagate using asyncio.sleep
             
             # Wait a bit longer for all events to propagate
             logger.info(f"Waiting for final events to propagate...")
-            time.sleep(delay_between_inserts * 2)
+            await asyncio.sleep(delay_between_inserts * 2)  # Use asyncio.sleep instead
             
             # Print event summary
             self.test_observer.print_event_summary()
@@ -334,27 +301,30 @@ class ObserverDBTest:
             # Clean up test data if requested
             if cleanup_after_test:
                 logger.info("Cleaning up test data...")
-                self.clean_up_test_data()
+                await self.clean_up_test_data()  # Make the call awaitable
 
-    def cleanup(self):
-        """Clean up resources and connections."""
-        # Stop the Observer
-        if self.observer and self.is_listening:
-            try:
-                self.observer.stop()
-                self.is_listening = False
-                logger.info("Observer stopped")
-            except Exception as e:
-                logger.error(f"Error stopping Observer: {str(e)}")
-                
-        # Make sure any remaining test data is cleaned up
-        # This is a safety measure in case the test was interrupted before cleanup
+    async def cleanup(self):
+        """Clean up resources and connections asynchronously."""
         try:
-            self.clean_up_test_data()
+            # Stop the Observer
+            if self.observer and self.is_listening:
+                try:
+                    await self.observer.stop()
+                    self.is_listening = False
+                    logger.info("Observer stopped")
+                except Exception as e:
+                    logger.error(f"Error stopping Observer: {str(e)}")
+                    
+            # Make sure any remaining test data is cleaned up
+            # This is a safety measure in case the test was interrupted before cleanup
+            try:
+                await self.clean_up_test_data()
+            except Exception as e:
+                logger.error(f"Error during final cleanup of test data: {str(e)}")
         except Exception as e:
-            logger.error(f"Error during final cleanup of test data: {str(e)}")
+            logger.error(f"Error during cleanup: {str(e)}")
 
-    def clean_up_test_data(self):
+    async def clean_up_test_data(self):
         """Clean up test data from the database after test completion."""
         logger.info("Cleaning up test data from database...")
         
@@ -366,17 +336,17 @@ class ObserverDBTest:
             # Clean up performance history records
             for record in self.test_records['performance_history']:
                 if 'id' in record:  # We can only delete records with IDs
-                    self.delete_test_record('performance_history', record['id'])
+                    await self.delete_test_record('performance_history', record['id'])
             
             # Clean up allocation history records
             for record in self.test_records['abs_vault_allocation_history']:
                 if 'id' in record:
-                    self.delete_test_record('abs_vault_allocation_history', record['id'])
+                    await self.delete_test_record('abs_vault_allocation_history', record['id'])
             
             # Clean up vault info records
             for record in self.test_records['abs_vault_info']:
                 if 'id' in record:
-                    self.delete_test_record('abs_vault_info', record['id'])
+                    await self.delete_test_record('abs_vault_info', record['id'])
             
             logger.info("Test data cleanup completed successfully")
             return True
@@ -384,7 +354,7 @@ class ObserverDBTest:
             logger.error(f"Error cleaning up test data: {str(e)}")
             return False
             
-    def delete_test_record(self, table_name: str, record_id: str) -> bool:
+    async def delete_test_record(self, table_name: str, record_id: str) -> bool:
         """Delete a test record from the specified table.
         
         Args:
@@ -399,24 +369,6 @@ class ObserverDBTest:
             return False
         
         try:
-            # Create an event loop for async operations
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Create a new event loop if the current one is already running
-                new_loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(new_loop)
-                future = asyncio.run_coroutine_threadsafe(self._async_delete_test_record(table_name, record_id), new_loop)
-                return future.result()  # Wait for the result
-            else:
-                # Use the current event loop
-                return loop.run_until_complete(self._async_delete_test_record(table_name, record_id))
-        except Exception as e:
-            logger.error(f"Error deleting from {table_name}: {str(e)}")
-            return False
-    
-    async def _async_delete_test_record(self, table_name: str, record_id: str) -> bool:
-        """Async version of delete_test_record for async Supabase client."""
-        try:
             response = await self.supabase_client.table(table_name).delete().eq('id', record_id).execute()
             data = response.data
             if data:
@@ -429,7 +381,7 @@ class ObserverDBTest:
             logger.error(f"Error deleting from {table_name}: {str(e)}")
             return False
 
-    def setup_supabase_listener(self):
+    async def setup_supabase_listener(self):
         """Set up the Supabase listener to monitor database changes."""
         if not self.supabase_client:
             logger.error("Cannot set up listener: Supabase client not initialized")
@@ -439,11 +391,6 @@ class ObserverDBTest:
             # Import the Observer class from observer.py
             from src.observer.observer import Observer
             
-            # Check if supabase_client is properly configured for realtime
-            if not hasattr(self.supabase_client, 'channel'):
-                logger.error("Cannot set up listener: Supabase client does not have channel method")
-                return False
-                
             # Create and start the Observer with our Supabase client
             self.observer = Observer(
                 supabase_client=self.supabase_client,
@@ -453,8 +400,8 @@ class ObserverDBTest:
                 vault_info_table='abs_vault_info'
             )
             
-            # Start the Observer (this will set up the listeners)
-            self.observer.start()
+            # Start the Observer asynchronously (this will set up the listeners)
+            await self.observer.start()
             self.is_listening = True
             logger.info("Observer started successfully with realtime capabilities")
             return True
@@ -462,8 +409,24 @@ class ObserverDBTest:
             logger.error(f"Failed to set up Observer: {str(e)}")
             return False
 
-def main():
-    """Main function to run the test."""
+    def setup_supabase_listener_sync(self):
+        """Synchronous wrapper for setup_supabase_listener."""
+        try:
+            import asyncio
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                new_loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(new_loop)
+                future = asyncio.run_coroutine_threadsafe(self.setup_supabase_listener(), new_loop)
+                return future.result()
+            else:
+                return loop.run_until_complete(self.setup_supabase_listener())
+        except Exception as e:
+            logger.error(f"Error in setup_supabase_listener_sync: {str(e)}")
+            return False
+
+async def async_main():
+    """Async main function to run the test."""
     parser = argparse.ArgumentParser(description='Test Observer system with real database for standard events: performance history, allocation history, and vault info')
     
     parser.add_argument('--url', required=True,
@@ -495,15 +458,15 @@ def main():
     
     try:
         # Connect to Supabase
-        if not test.connect_to_supabase():
+        if not await test.connect_to_supabase():
             logger.error("Failed to connect to Supabase, exiting")
             return
         
         # Set up observer system
         test.setup_observer_system()
         
-        # Set up Supabase listener
-        if not test.setup_supabase_listener():
+        # Set up Supabase listener (using the async method directly)
+        if not await test.setup_supabase_listener():
             logger.error("Failed to set up Supabase listener, exiting")
             return
         
@@ -512,10 +475,19 @@ def main():
         test.generate_test_data()
         
         # Run test sequence
-        test.run_test_sequence(args.delay, not args.no_cleanup)
+        await test.run_test_sequence(args.delay, not args.no_cleanup)
     finally:
-        # Clean up
-        test.cleanup()
+        # Clean up using the async method
+        await test.cleanup()
+
+def main():
+    """Main function that runs the async_main function in an event loop."""
+    try:
+        asyncio.run(async_main())
+    except Exception as e:
+        logger.error(f"Unhandled exception in main: {str(e)}")
+        return 1
+    return 0
 
 if __name__ == '__main__':
-    main() 
+    sys.exit(main()) 
