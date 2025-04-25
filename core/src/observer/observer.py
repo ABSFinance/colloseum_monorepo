@@ -48,10 +48,6 @@ class Observer:
         
         This method sets up realtime listening to Supabase channels.
         """
-
-        # Check if we're dealing with a coroutine
-        self.logger.info(f"Start listening for Supabase realtime updates")
-
         if self.is_running:
             self.logger.warning("Supabase listener already running")
             return
@@ -60,15 +56,11 @@ class Observer:
         self.is_running = True
         
         try:
-   
-            # Check if channel attribute/method exists
-            if hasattr(self.supabase_client, 'channel'):
-                self.logger.info("'channel' method found in supabase_client")
-            else:
-                self.logger.error("'channel' method NOT found in supabase_client! Available methods: {dir(self.supabase_client)}")
-                
-            # Create the channel for performance history updates
+            # Create the channel
             self.channels["performance_history"] = self.supabase_client.channel('performance_changes')
+            self.channels["allocation_history"] = self.supabase_client.channel('allocation_changes')
+            self.channels["vault_info_insert"] = self.supabase_client.channel('vault_info_insert')
+            self.channels["vault_info_update"] = self.supabase_client.channel('vault_info_update')
 
             # Set up Supabase realtime subscription for market data table (performance history)
             self.channels["performance_history"].on_postgres_changes(
@@ -76,13 +68,7 @@ class Observer:
                     schema="public",
                     table=self.market_data_table,
                     callback=self._handle_performance_history
-                    # callback=print("market data")
                 )
-            
-            # Create channels for other tables
-            self.channels["allocation_history"] = self.supabase_client.channel('allocation_changes')
-            self.channels["vault_info_insert"] = self.supabase_client.channel('vault_info_insert')
-            self.channels["vault_info_update"] = self.supabase_client.channel('vault_info_update')
             
             # Set up Supabase realtime subscription for portfolio state table (allocation history)
             self.channels["allocation_history"].on_postgres_changes(
@@ -112,6 +98,8 @@ class Observer:
             for channel_name, channel in self.channels.items():
                 self.logger.info(f"Subscribing to channel: {channel_name}")
                 await channel.subscribe()
+                # Wait a bit to ensure subscription is established
+                await asyncio.sleep(1)
             
             self.logger.info("Supabase listener subscribed successfully to all channels")
         except Exception as e:
@@ -146,10 +134,10 @@ class Observer:
         Args:
             payload: The payload containing the new record data
         """
-        print("performance_history payload", payload)
         try:
-            # Extract the new record from the payload
-            record = payload.get('new', {})
+            # Extract the record from the payload
+            data = payload.get('data', {})
+            record = data.get('record', {})
             if not record:
                 self.logger.warning("Received empty performance history record from Supabase")
                 return
@@ -174,8 +162,8 @@ class Observer:
         try:
             # Extract the new record from the payload
 
-            print("allocation_history payload", payload)
-            record = payload.get('new', {})
+            data = payload.get('data', {})
+            record = data.get('record', {})
             if not record:
                 self.logger.warning("Received empty allocation history record from Supabase")
                 return
@@ -204,8 +192,8 @@ class Observer:
         """
         try:
             # Extract the new record from the payload
-            print("vault_info payload", payload)
-            record = payload.get('new', {})
+            data = payload.get('data', {})
+            record = data.get('record', {})
             if not record:
                 self.logger.warning("Received empty vault info record from Supabase")
                 return

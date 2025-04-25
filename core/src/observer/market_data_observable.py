@@ -30,7 +30,7 @@ class MarketDataObservable(Observable):
         """
         # Extract key data from the record
         pool_id = record.get('pool_id')
-        timestamp = record.get('timestamp', datetime.now().isoformat())
+        timestamp = record.get('created_at', datetime.now().isoformat())
         apy = record.get('apy', 0.0)
         tvl = record.get('tvl', 0.0)
         

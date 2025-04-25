@@ -33,7 +33,7 @@ class PortfolioStateObservable(Observable):
             allocated_pool_id = record.get('allocated_pool_id')
             amount = record.get('amount', 0)
             status = record.get('status')
-            timestamp = record.get('timestamp', datetime.now().isoformat())
+            timestamp = record.get('created_at', datetime.now().isoformat())
             
             if pool_id is None:
                 self._logger.warning("Allocation history record missing pool_id field")
@@ -55,9 +55,11 @@ class PortfolioStateObservable(Observable):
                 self._logger.info(f"Detected deposit event for pool {pool_id}: amount {amount}")
                 self.notify(EventTypes.DEPOSIT_EVENT, event_data)
             # Check for withdrawal event (pool_id equals allocated_pool_id, amount < 0, status = 'pending')
-            elif pool_id == allocated_pool_id and amount < 0 and status == 'pending':
+            elif pool_id == allocated_pool_id and amount < 0 and status == 'PENDING':
                 self._logger.info(f"Detected withdrawal event for pool {pool_id}: amount {amount}, status {status}")
                 self.notify(EventTypes.WITHDRAWAL_EVENT, event_data)
+            else:
+                self._logger.info(f"Ignoring allocation history record for pool {pool_id}: amount {amount}, status {status}")
   
         except Exception as e:
             self._logger.error(f"Error processing allocation history record: {str(e)}")

@@ -55,9 +55,9 @@ class OptimizerInterface:
         self.logger.info(f"Processing market data update for pool {pool_id}")
         
         # Call optimizer service if available
-        if self.optimizer_service and hasattr(self.optimizer_service, 'optimize'):
+        if self.optimizer_service and hasattr(self.optimizer_service, 'handle_market_data'):
             try:
-                result = self.optimizer_service.optimize(event_data)
+                result = self.optimizer_service.handle_market_data(event_data)
                 self.logger.info(f"Optimization completed for pool {pool_id}")
                 return result
             except Exception as e:
@@ -79,9 +79,9 @@ class OptimizerInterface:
         self.logger.info(f"Processing deposit event for pool {pool_id}")
         
         # Call optimizer service if available
-        if self.optimizer_service and hasattr(self.optimizer_service, 'reoptimize'):
+        if self.optimizer_service and hasattr(self.optimizer_service, 'handle_vault_update'):
             try:
-                result = self.optimizer_service.reoptimize(event_data)
+                result = self.optimizer_service.handle_vault_update(event_data)
                 self.logger.info(f"Reoptimization completed for pool {pool_id} after deposit")
                 return result
             except Exception as e:
@@ -102,9 +102,9 @@ class OptimizerInterface:
         self.logger.info(f"Processing withdrawal event for pool {pool_id}")
         
         # Call optimizer service if available
-        if self.optimizer_service and hasattr(self.optimizer_service, 'reoptimize'):
+        if self.optimizer_service and hasattr(self.optimizer_service, 'handle_vault_update'):
             try:
-                result = self.optimizer_service.reoptimize(event_data)
+                result = self.optimizer_service.handle_vault_update(event_data)
                 self.logger.info(f"Reoptimization completed for pool {pool_id} after withdrawal")
                 return result
             except Exception as e:
@@ -125,9 +125,9 @@ class OptimizerInterface:
         self.logger.info(f"Processing vault info update for pool {pool_id}")
         
         # Call optimizer service if available
-        if self.optimizer_service and hasattr(self.optimizer_service, 'update_strategy'):
+        if self.optimizer_service and hasattr(self.optimizer_service, 'handle_vault_update'):
             try:
-                result = self.optimizer_service.update_strategy(event_data)
+                result = self.optimizer_service.handle_vault_update(event_data)
                 self.logger.info(f"Strategy update completed for pool {pool_id}")
                 return result
             except Exception as e:
@@ -326,7 +326,7 @@ class EventHandler:
         
         self.logger.info("Initializing Event Handler")
         
-    def setup(self) -> None:
+    async def setup(self) -> None:
         """Set up all components and connect them together."""
         self.logger.info("Setting up event handling system")
         
@@ -338,7 +338,7 @@ class EventHandler:
         
         # Set up the Observer if Supabase service is available
         if 'supabase_service' in self.services:
-            self._setup_observer()
+            await self._setup_observer()
         
         # Start the message broker
         self.message_broker.start()
@@ -408,6 +408,7 @@ class EventHandler:
                 [self.logging_observer.handle_event]
             )
         
+        # Register specific handlers for each event type
         self.observer_manager.register_observer(
             'portfolio_state', EventTypes.DEPOSIT_EVENT, handle_deposit
         )
@@ -420,23 +421,15 @@ class EventHandler:
             'vault', EventTypes.VAULT_INFO_RECORD, handle_vault_info
         )
         
-        # Also connect the logging observer directly to all events for immediate logging
-        for observable_name in ['market_data', 'portfolio_state', 'vault']:
-            for event_type in [
-                EventTypes.NEW_PERFORMANCE_HISTORY_RECORD,
-                EventTypes.DEPOSIT_EVENT,
-                EventTypes.WITHDRAWAL_EVENT,
-                EventTypes.VAULT_INFO_RECORD,
-            ]:
-                self.observer_manager.register_observer(
-                    observable_name, event_type, 
-                    lambda event_data, event_type=event_type: 
-                        self.logging_observer.handle_event(event_type, event_data)
-                )
+        
+        self.observer_manager.register_observer(
+            'market_data', EventTypes.NEW_PERFORMANCE_HISTORY_RECORD, 
+            handle_market_data
+        )
         
         self.logger.info("Connected observers to observables")
     
-    def _setup_observer(self) -> None:
+    async def _setup_observer(self) -> None:
         """Set up the Observer to listen to Supabase events."""
         supabase_service = self.services.get('supabase_service')
         if not supabase_service:
@@ -447,13 +440,13 @@ class EventHandler:
         try:
             observer_config = self.config.get('observer', {})
             self.observer = Observer(
-                supabase_client=supabase_service.client,
+                supabase_client=supabase_service,
                 observer_manager=self.observer_manager,
                 market_data_table=observer_config.get('market_data_table', 'performance_history'),
                 portfolio_state_table=observer_config.get('portfolio_state_table', 'abs_vault_allocation_history'),
                 vault_info_table=observer_config.get('vault_info_table', 'abs_vault_info')
             )
-            self.observer.start()
+            await self.observer.start()
             self.logger.info("Observer started successfully")
         except Exception as e:
             self.logger.error(f"Failed to initialize Observer: {str(e)}")
@@ -501,7 +494,7 @@ class EventHandler:
         except Exception as e:
             self.logger.error(f"Error triggering vault info update: {str(e)}")
     
-    def shutdown(self) -> None:
+    async def shutdown(self) -> None:
         """Clean up resources and shut down the event handling system."""
         self.logger.info("Shutting down event handler")
         
@@ -516,7 +509,7 @@ class EventHandler:
         # Stop the Observer
         if hasattr(self, 'observer'):
             try:
-                self.observer.stop()
+                await self.observer.stop()
                 self.logger.info("Observer stopped")
             except Exception as e:
                 self.logger.error(f"Error stopping Observer: {str(e)}")

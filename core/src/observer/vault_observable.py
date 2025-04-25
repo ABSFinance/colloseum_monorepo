@@ -35,16 +35,28 @@ class VaultObservable(Observable):
                 return
                 
             # Extract common fields
-            strategy = record.get('strategy')
+            name = record.get('name')
+            address = record.get('address')
+            pool_id = record.get('pool_id')
+            org_id = record.get('org_id')
+            underlying_token = record.get('underlying_token')
+            capacity = record.get('capacity')
+            adaptors = record.get('adaptors')
             allowed_pools = record.get('allowed_pools')
-            timestamp = record.get('updated_at')
+            updated_at = record.get('updated_at')
             
             # Prepare event data
             event_data = {
                 'pool_id': pool_id,
-                'strategy': strategy,
+                'name': name,
+                'address': address,
+                'pool_id': pool_id,
+                'org_id': org_id,
+                'underlying_token': underlying_token,
+                'capacity': capacity,
+                'adaptors': adaptors,
                 'allowed_pools': allowed_pools,
-                'timestamp': timestamp
+                'timestamp': updated_at
             }
             
             # Notify observers of new vault info

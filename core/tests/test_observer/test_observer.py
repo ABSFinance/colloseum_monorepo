@@ -105,7 +105,6 @@ class TestObserver(LoggingObserver):
         """Clear stored events."""
         self.events = {}
         self.event_counts = {}
-        self.logger.info("TestObserver cleared")
     
     def get_events(self, event_type: str = None, pool_id: str = None) -> List[Dict[str, Any]]:
         """Get stored events of a specific type and/or for a specific pool.

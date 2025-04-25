@@ -5,7 +5,9 @@ flask>=2.0.0
 supabase>=2.15.0
 python-dotenv>=0.19.0
 dataclasses-json>=0.5.6
+pyzmq>=25.1.0
 
+# Supabase dependencies
 realtime>=1.0.0
 supafunc>=0.3.0
 storage3>=0.8.0

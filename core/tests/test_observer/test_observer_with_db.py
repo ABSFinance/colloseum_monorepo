@@ -16,7 +16,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional
 import uuid
 import asyncio
-
+import random
 # Import the Supabase client module
 from supabase import create_async_client, AsyncClient
 
@@ -59,6 +59,7 @@ class ObserverDBTest:
         # Test data
         self.test_pools = []
         self.test_records = {
+            'pool_info': [],
             'performance_history': [],
             'abs_vault_allocation_history': [],
             'abs_vault_info': []
@@ -139,7 +140,7 @@ class ObserverDBTest:
         """
         self.test_pools = []
         for i in range(num_pools):
-            pool_id = 2000
+            pool_id = random.randint(1000000, 10000000)
             self.test_pools.append(pool_id)
         
         logger.info(f"Generated {num_pools} test pools: {self.test_pools}")
@@ -151,6 +152,34 @@ class ObserverDBTest:
             self.generate_test_pools()
         
         now = datetime.now()
+
+        # Generate pool info test data
+        for pool_id in self.test_pools:
+            pool_info_record = {
+                'id': pool_id,
+                'type': 'abs_vault',
+                'created_at': now.isoformat(),
+                'updated_at': now.isoformat(),
+            }
+            self.test_records['pool_info'].append(pool_info_record)
+            
+        # Generate vault info test data
+        for pool_id in self.test_pools:
+            vault_record = {
+                'name': f'test_vault_{pool_id}',
+                'address': f'92choftJrxdnv4FXoau1JsvsCbRcWX8TsUrBcGjo38e{pool_id}',
+                'pool_id': pool_id,
+                'org_id': 377,
+                'underlying_token': 'Sol11111111111111111111111111111111111111112',
+                'capacity': 1000000.0,
+                'adaptors': ['kamino-lend', 'drift-vault'],
+                'allowed_pools': [1105, 1088],
+                'description': 'test_description',
+                'created_at': datetime.now().isoformat(),
+                'updated_at': datetime.now().isoformat(),
+            }
+            self.test_records['abs_vault_info'].append(vault_record)
+        logger.info(f"Generated {len(self.test_records['abs_vault_info'])} vault info records")
         
         # Generate performance history test data
         for pool_id in self.test_pools:
@@ -158,7 +187,7 @@ class ObserverDBTest:
             for i in range(3):
                 timestamp = now - timedelta(hours=i)
                 record = {
-                    'pool_id': pool_id,
+                    'pool_id': 2000 + i,
                     'created_at': timestamp.isoformat(),
                     'apy': 0.05 + (i * 0.01),  # Slightly different APY values
                     'tvl': 1000000.0 - (i * 50000.0),  # Slightly different TVL values
@@ -172,7 +201,7 @@ class ObserverDBTest:
                 'pool_id': pool_id,
                 'allocated_pool_id': pool_id,  # Same pool ID for deposit
                 'amount': 5000.0,
-                'status': 'completed',
+                'status': 'COMPLETED',
                 'created_at': (now - timedelta(minutes=30)).isoformat(),
             }
             self.test_records['abs_vault_allocation_history'].append(deposit_record)
@@ -182,21 +211,10 @@ class ObserverDBTest:
                 'pool_id': pool_id,
                 'allocated_pool_id': pool_id,  # Same pool ID for withdrawal
                 'amount': -2000.0,
-                'status': 'pending',
+                'status': 'PENDING',
                 'created_at': now.isoformat(),
             }
             self.test_records['abs_vault_allocation_history'].append(withdrawal_record)
-            
-        # Generate vault info test data
-        for pool_id in self.test_pools:
-            vault_record = {
-                'pool_id': pool_id,
-                'strategy': 'A',
-                'allowed_pools': self.test_pools,  # All pools allowed
-                'updated_at': now.isoformat(),
-                'created_at': (now - timedelta(days=1)).isoformat(),
-            }
-            self.test_records['abs_vault_info'].append(vault_record)
 
     async def insert_test_data(self, table_name: str, record: Dict[str, Any]) -> bool:
         """Insert a test record into the specified table asynchronously.
@@ -259,8 +277,7 @@ class ObserverDBTest:
             logger.error("Cannot run test: Supabase listener not started")
             return
         
-        logger.info("Starting test sequence")
-        
+
         # Clear any previous test events
         self.test_observer.clear()
         
@@ -270,17 +287,23 @@ class ObserverDBTest:
                 logger.info(f"Inserting performance history record {i+1}/{len(self.test_records['performance_history'])}")
                 await self.insert_test_data('performance_history', record)
                 await asyncio.sleep(delay_between_inserts)  # Wait for events to propagate using asyncio.sleep
+                
+            # Insert pool info records
+            for i, record in enumerate(self.test_records['pool_info']):
+                logger.info(f"Inserting pool info record {i+1}/{len(self.test_records['pool_info'])}")
+                await self.insert_test_data('pool_info', record)
+                await asyncio.sleep(delay_between_inserts)  # Wait for events to propagate using asyncio.sleep
+                
+            # Insert vault info records
+            for i, record in enumerate(self.test_records['abs_vault_info']):
+                logger.info(f"Inserting vault info record {i+1}/{len(self.test_records['abs_vault_info'])}")
+                await self.insert_test_data('abs_vault_info', record)
+                await asyncio.sleep(delay_between_inserts)  # Wait for events to propagate using asyncio.sleep
             
             # Insert allocation history records
             for i, record in enumerate(self.test_records['abs_vault_allocation_history']):
                 logger.info(f"Inserting allocation history record {i+1}/{len(self.test_records['abs_vault_allocation_history'])}")
                 await self.insert_test_data('abs_vault_allocation_history', record)
-                await asyncio.sleep(delay_between_inserts)  # Wait for events to propagate using asyncio.sleep
-            
-            # Insert vault info records
-            for i, record in enumerate(self.test_records['abs_vault_info']):
-                logger.info(f"Inserting vault info record {i+1}/{len(self.test_records['abs_vault_info'])}")
-                await self.insert_test_data('abs_vault_info', record)
                 await asyncio.sleep(delay_between_inserts)  # Wait for events to propagate using asyncio.sleep
             
             # Wait a bit longer for all events to propagate
@@ -337,16 +360,22 @@ class ObserverDBTest:
             for record in self.test_records['performance_history']:
                 if 'id' in record:  # We can only delete records with IDs
                     await self.delete_test_record('performance_history', record['id'])
-            
+                    
             # Clean up allocation history records
             for record in self.test_records['abs_vault_allocation_history']:
                 if 'id' in record:
                     await self.delete_test_record('abs_vault_allocation_history', record['id'])
-            
+                    
             # Clean up vault info records
             for record in self.test_records['abs_vault_info']:
                 if 'id' in record:
                     await self.delete_test_record('abs_vault_info', record['id'])
+            
+            # Clean up pool info records
+            for record in self.test_records['pool_info']:
+                if 'id' in record:
+                    await self.delete_test_record('pool_info', record['id'])
+                    
             
             logger.info("Test data cleanup completed successfully")
             return True
@@ -472,6 +501,7 @@ async def async_main():
         
         # Generate test data
         test.generate_test_pools(args.pools)
+        print(f"Finished generating {len(test.test_pools)} test pools")
         test.generate_test_data()
         
         # Run test sequence
