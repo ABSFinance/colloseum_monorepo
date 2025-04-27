@@ -28,6 +28,7 @@ from ..observer.portfolio_state_observable import PortfolioStateObservable
 from ..observer.vault_observable import VaultObservable
 from ..observer.logging_observer import LoggingObserver
 from ..observer.observer import Observer
+from ..optimizer.optimizer import Optimizer  # Import the Optimizer class
 
 # Define the interface for working with the optimizer and evaluator
 class OptimizerInterface:
@@ -51,14 +52,16 @@ class OptimizerInterface:
         Returns:
             Dict with optimization results
         """
+
         pool_id = event_data.get('pool_id')
         self.logger.info(f"Processing market data update for pool {pool_id}")
         
         # Call optimizer service if available
         if self.optimizer_service and hasattr(self.optimizer_service, 'handle_market_data'):
             try:
+                # Use the handle_market_data method directly from the Optimizer class
+                # No need to pass vault_data since it's just market data
                 result = self.optimizer_service.handle_market_data(event_data)
-                self.logger.info(f"Optimization completed for pool {pool_id}")
                 return result
             except Exception as e:
                 self.logger.error(f"Error during optimization for pool {pool_id}: {str(e)}")
@@ -81,6 +84,7 @@ class OptimizerInterface:
         # Call optimizer service if available
         if self.optimizer_service and hasattr(self.optimizer_service, 'handle_vault_update'):
             try:
+                # For deposit events, we pass the event_data as vault_info
                 result = self.optimizer_service.handle_vault_update(event_data)
                 self.logger.info(f"Reoptimization completed for pool {pool_id} after deposit")
                 return result
@@ -104,6 +108,7 @@ class OptimizerInterface:
         # Call optimizer service if available
         if self.optimizer_service and hasattr(self.optimizer_service, 'handle_vault_update'):
             try:
+                # For withdrawal events, we pass the event_data as vault_info
                 result = self.optimizer_service.handle_vault_update(event_data)
                 self.logger.info(f"Reoptimization completed for pool {pool_id} after withdrawal")
                 return result
@@ -127,6 +132,7 @@ class OptimizerInterface:
         # Call optimizer service if available
         if self.optimizer_service and hasattr(self.optimizer_service, 'handle_vault_update'):
             try:
+                # For vault info updates, we pass the event_data as vault_info
                 result = self.optimizer_service.handle_vault_update(event_data)
                 self.logger.info(f"Strategy update completed for pool {pool_id}")
                 return result
@@ -300,9 +306,16 @@ class EventHandler:
         # Create observer manager
         self.observer_manager = ObserverManager()
         
+        # Create optimizer instance if not provided in services
+        optimizer_service = services.get('optimizer_service')
+        if optimizer_service is None and 'supabase_service' in services:
+            # Create an optimizer instance with the Supabase client
+            optimizer_service = Optimizer(supabase_client=services.get('supabase_service'))
+            services['optimizer_service'] = optimizer_service
+        
         # Create optimizer interface
         self.optimizer = OptimizerInterface(
-            optimizer_service=services.get('optimizer_service')
+            optimizer_service=optimizer_service
         )
         
         # Create evaluator interface
@@ -335,6 +348,16 @@ class EventHandler:
         
         # Connect observers to observables based on event types
         self._connect_observers_to_observables()
+
+        # Initialize market data if optimizer service is available
+        if 'optimizer_service' in self.services:
+            try:
+                self.logger.info("Initializing market data...")
+                await self.services['optimizer_service'].initialize_market_data()
+                await self.services['optimizer_service'].initialize_vault_info()
+                self.logger.info("Market data initialization complete")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize market data: {str(e)}")
         
         # Set up the Observer if Supabase service is available
         if 'supabase_service' in self.services:
@@ -367,6 +390,10 @@ class EventHandler:
         
         # Market data events
         def handle_market_data(event_data):
+            # Ensure consistent naming - if timestamp exists but created_at doesn't, copy it over
+            if 'timestamp' in event_data and 'created_at' not in event_data:
+                event_data['created_at'] = event_data['timestamp']
+            
             # First pass through optimizer
             opt_result = self.optimizer.handle_market_data_update(event_data)
             # Then through evaluator
@@ -489,6 +516,7 @@ class EventHandler:
         """
         try:
             vault_observable = self.observer_manager.get_observable('vault')
+            print(f"vault_observable data: {data}")
             vault_observable.update_vault_info(data)
             self.logger.debug(f"Manually triggered vault info update for pool {data.get('pool_id', 'unknown')}")
         except Exception as e:
@@ -517,7 +545,7 @@ class EventHandler:
 
 # Example application initialization code:
 """
-def initialize_event_system(services):
+async def initialize_event_system(services):
     # Define configuration
     config = {
         'logging': {
@@ -542,9 +570,50 @@ def initialize_event_system(services):
     publisher.bind(config['zmq']['pub_address'])
     services['zmq_publisher'] = publisher
     
+    # If you have a Supabase client, the Optimizer will be created automatically
+    # Or you can create and provide an Optimizer instance manually:
+    # from ..optimizer.optimizer import Optimizer
+    # optimizer = Optimizer(supabase_client=services.get('supabase_service'))
+    # services['optimizer_service'] = optimizer
+    
     # Create and set up event handler
     event_handler = EventHandler(services, config)
-    event_handler.setup()
+    # Set up the event handler (this is an async method)
+    await event_handler.setup()
     
+    return event_handler
+
+# Example usage with manual optimizer initialization:
+async def example_with_manual_optimizer():
+    services = {}
+    
+    # Initialize Supabase client (placeholder - replace with actual initialization)
+    from supabase import create_client
+    supabase_url = "your-supabase-url"
+    supabase_key = "your-supabase-key"
+    supabase_client = create_client(supabase_url, supabase_key)
+    services['supabase_service'] = supabase_client
+    
+    # Initialize optimizer manually with supabase client
+    from ..optimizer.optimizer import Optimizer
+    optimizer = Optimizer(supabase_client=supabase_client)
+    services['optimizer_service'] = optimizer
+    
+    # Initialize event system
+    event_handler = await initialize_event_system(services)
+    
+    # You can directly interact with the optimizer interface
+    # For example, to manually trigger market data processing:
+    # market_data = {"pool_id": "123", "apy": 5.2, "created_at": "2023-01-01T00:00:00Z"}
+    # result = event_handler.optimizer.handle_market_data_update(market_data)
+    
+    return event_handler
+
+# For non-async environments, you can use:
+def run_event_system():
+    import asyncio
+    services = {}
+    # ... set up services ...
+    event_handler = asyncio.run(initialize_event_system(services))
     return event_handler
 """ 

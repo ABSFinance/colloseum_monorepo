@@ -28,3 +28,4 @@ flake8>=3.9.2
 # Documentation
 sphinx>=4.0.2
 sphinx-rtd-theme>=0.5.2
+riskfolio-lib>=3.0.0

@@ -12,7 +12,7 @@ import time
 import argparse
 import logging
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Dict, Any, List, Optional
 import uuid
 import asyncio
@@ -142,7 +142,7 @@ class EventHandlerDBTest:
             logger.warning("No test pools defined, generating default pools")
             self.generate_test_pools()
         
-        now = datetime.now()
+        now = datetime.now(UTC)
 
         # Generate pool info test data
         for pool_id in self.test_pools:
@@ -166,13 +166,15 @@ class EventHandlerDBTest:
                 'adaptors': ['kamino-lend', 'drift-vault'],
                 'allowed_pools': [1105, 1088],
                 'description': 'test_description',
-                'created_at': datetime.now().isoformat(),
-                'updated_at': datetime.now().isoformat(),
+                'created_at': now.isoformat(),
+                'updated_at': now.isoformat(),
             }
             self.test_records['abs_vault_info'].append(vault_record)
+
+        pool_ids = [1105, 1088, 1074]
         
         # Generate performance history test data
-        for pool_id in self.test_pools:
+        for pool_id in pool_ids:
             for i in range(3):
                 timestamp = now - timedelta(hours=i)
                 record = {
