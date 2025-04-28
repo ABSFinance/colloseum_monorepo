@@ -20,6 +20,8 @@ import time
 from typing import Dict, Any, Optional, List, Callable
 import threading
 import queue
+import zmq
+import asyncio
 
 # Import components
 from ..observer import ObserverManager, EventTypes
@@ -28,7 +30,8 @@ from ..observer.portfolio_state_observable import PortfolioStateObservable
 from ..observer.vault_observable import VaultObservable
 from ..observer.logging_observer import LoggingObserver
 from ..observer.observer import Observer
-from ..optimizer.optimizer import Optimizer  # Import the Optimizer class
+from ..optimizer.optimizer import Optimizer
+from ..evaluator.evaluator import Evaluator
 
 # Define the interface for working with the optimizer and evaluator
 class OptimizerInterface:
@@ -43,7 +46,7 @@ class OptimizerInterface:
         self.optimizer_service = optimizer_service
         self.logger = logging.getLogger(f"{__name__}.OptimizerInterface")
     
-    def handle_market_data_update(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_market_data_update(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handle market data updates.
         
         Args:
@@ -52,24 +55,20 @@ class OptimizerInterface:
         Returns:
             Dict with optimization results
         """
-
         pool_id = event_data.get('pool_id')
         self.logger.info(f"Processing market data update for pool {pool_id}")
         
         # Call optimizer service if available
         if self.optimizer_service and hasattr(self.optimizer_service, 'handle_market_data'):
             try:
-                # Use the handle_market_data method directly from the Optimizer class
-                # No need to pass vault_data since it's just market data
-                result = self.optimizer_service.handle_market_data(event_data)
+                result = await self.optimizer_service.handle_market_data(event_data)
                 return result
             except Exception as e:
                 self.logger.error(f"Error during optimization for pool {pool_id}: {str(e)}")
         
-        # If no optimizer service, just return the event data
         return event_data
     
-    def handle_deposit_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_deposit_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handle deposit events.
         
         Args:
@@ -84,8 +83,7 @@ class OptimizerInterface:
         # Call optimizer service if available
         if self.optimizer_service and hasattr(self.optimizer_service, 'handle_vault_update'):
             try:
-                # For deposit events, we pass the event_data as vault_info
-                result = self.optimizer_service.handle_vault_update(event_data)
+                result = await self.optimizer_service.handle_vault_update(event_data)
                 self.logger.info(f"Reoptimization completed for pool {pool_id} after deposit")
                 return result
             except Exception as e:
@@ -93,7 +91,7 @@ class OptimizerInterface:
         
         return event_data
     
-    def handle_withdrawal_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_withdrawal_event(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handle withdrawal events.
         
         Args:
@@ -108,8 +106,7 @@ class OptimizerInterface:
         # Call optimizer service if available
         if self.optimizer_service and hasattr(self.optimizer_service, 'handle_vault_update'):
             try:
-                # For withdrawal events, we pass the event_data as vault_info
-                result = self.optimizer_service.handle_vault_update(event_data)
+                result = await self.optimizer_service.handle_vault_update(event_data)
                 self.logger.info(f"Reoptimization completed for pool {pool_id} after withdrawal")
                 return result
             except Exception as e:
@@ -117,7 +114,7 @@ class OptimizerInterface:
         
         return event_data
     
-    def handle_vault_info_update(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
+    async def handle_vault_info_update(self, event_data: Dict[str, Any]) -> Dict[str, Any]:
         """Handle vault info updates.
         
         Args:
@@ -132,8 +129,7 @@ class OptimizerInterface:
         # Call optimizer service if available
         if self.optimizer_service and hasattr(self.optimizer_service, 'handle_vault_update'):
             try:
-                # For vault info updates, we pass the event_data as vault_info
-                result = self.optimizer_service.handle_vault_update(event_data)
+                result = await self.optimizer_service.handle_vault_update(event_data)
                 self.logger.info(f"Strategy update completed for pool {pool_id}")
                 return result
             except Exception as e:
@@ -154,7 +150,7 @@ class EvaluatorInterface:
         self.evaluator_service = evaluator_service
         self.logger = logging.getLogger(f"{__name__}.EvaluatorInterface")
     
-    def evaluate_optimization_result(self, optimization_result: Dict[str, Any]) -> Dict[str, Any]:
+    async def evaluate_optimization_result(self, optimization_result: Dict[str, Any]) -> Dict[str, Any]:
         """Evaluate optimization results.
         
         Args:
@@ -167,126 +163,18 @@ class EvaluatorInterface:
         self.logger.info(f"Evaluating optimization result for pool {pool_id}")
         
         # Call evaluator service if available
-        if self.evaluator_service and hasattr(self.evaluator_service, 'evaluate'):
+        if self.evaluator_service and hasattr(self.evaluator_service, 'run_reallocation_flow'):
             try:
-                result = self.evaluator_service.evaluate(optimization_result)
-                self.logger.info(f"Evaluation completed for pool {pool_id}")
+                result = await self.evaluator_service.run_reallocation_flow(pool_id, optimization_result)
+                self.logger.info(f"Reallocation flow completed for pool {pool_id}")
                 return result
             except Exception as e:
-                self.logger.error(f"Error during evaluation for pool {pool_id}: {str(e)}")
+                self.logger.error(f"Error during reallocation flow for pool {pool_id}: {str(e)}")
+                
+        else:
+            self.logger.warning(f"Evaluator service not available or missing run_reallocation_flow method: {self.evaluator_service}")
         
         return optimization_result
-
-
-class MessageBroker:
-    """Message broker for handling communication between components."""
-    
-    def __init__(self, zmq_enabled: bool = False, zmq_publisher=None):
-        """Initialize the message broker.
-        
-        Args:
-            zmq_enabled: Whether to enable ZeroMQ for messaging
-            zmq_publisher: ZeroMQ publisher instance
-        """
-        self.zmq_enabled = zmq_enabled
-        self.zmq_publisher = zmq_publisher
-        self.logger = logging.getLogger(f"{__name__}.MessageBroker")
-        
-        # Create a processing queue and worker thread for async processing
-        self.processing_queue = queue.Queue()
-        self.worker_thread = None
-        self.is_running = False
-    
-    def start(self):
-        """Start the message broker worker thread."""
-        if self.is_running:
-            return
-        
-        self.is_running = True
-        self.worker_thread = threading.Thread(target=self._process_queue, daemon=True)
-        self.worker_thread.start()
-        self.logger.info("Message broker worker thread started")
-    
-    def stop(self):
-        """Stop the message broker worker thread."""
-        if not self.is_running:
-            return
-        
-        self.is_running = False
-        if self.worker_thread:
-            self.worker_thread.join(timeout=5.0)
-        self.logger.info("Message broker worker thread stopped")
-    
-    def _process_queue(self):
-        """Process the message queue in a worker thread."""
-        while self.is_running:
-            try:
-                # Get a message from the queue with a timeout
-                try:
-                    message_type, message_data, callbacks = self.processing_queue.get(timeout=1.0)
-                except queue.Empty:
-                    continue
-                
-                # Process the message
-                self.logger.debug(f"Processing message of type {message_type}")
-                
-                # Call all callbacks registered for this message
-                for callback in callbacks:
-                    try:
-                        callback(message_data)
-                    except Exception as e:
-                        self.logger.error(f"Error in message callback: {str(e)}")
-                
-                # Publish via ZeroMQ if enabled
-                if self.zmq_enabled and self.zmq_publisher:
-                    self._publish_via_zmq(message_type, message_data)
-                
-                # Mark the task as done
-                self.processing_queue.task_done()
-                
-            except Exception as e:
-                self.logger.error(f"Error in message processing loop: {str(e)}")
-    
-    def _publish_via_zmq(self, message_type: str, message_data: Dict[str, Any]):
-        """Publish a message via ZeroMQ.
-        
-        Args:
-            message_type: Type of message to publish
-            message_data: Message data to publish
-        """
-        try:
-            # Create a message with topic and data
-            topic = f"colloseum.{message_type}"
-            message = {
-                'type': message_type,
-                'timestamp': time.time(),
-                'data': message_data
-            }
-            
-            # Convert to JSON
-            json_message = json.dumps(message)
-            
-            # Publish
-            self.zmq_publisher.send_multipart([
-                topic.encode('utf-8'),
-                json_message.encode('utf-8')
-            ])
-            
-            self.logger.debug(f"Published message of type {message_type} via ZeroMQ")
-        except Exception as e:
-            self.logger.error(f"Error publishing message via ZeroMQ: {str(e)}")
-    
-    def publish(self, message_type: str, message_data: Dict[str, Any], callbacks: List[Callable] = None):
-        """Publish a message to the broker.
-        
-        Args:
-            message_type: Type of message to publish
-            message_data: Message data to publish
-            callbacks: List of callback functions to call with the message data
-        """
-        # Add the message to the processing queue
-        self.processing_queue.put((message_type, message_data, callbacks or []))
-        self.logger.debug(f"Queued message of type {message_type} for processing")
 
 
 class EventHandler:
@@ -313,6 +201,22 @@ class EventHandler:
             optimizer_service = Optimizer(supabase_client=services.get('supabase_service'))
             services['optimizer_service'] = optimizer_service
         
+        # Create evaluator instance if not provided in services
+        evaluator_service = services.get('evaluator_service')
+        if evaluator_service is None and 'supabase_service' in services:
+            # Create an evaluator instance with the Supabase client
+            evaluator_service = Evaluator(supabase_client=services.get('supabase_service'))
+            services['evaluator_service'] = evaluator_service
+            
+            # Initialize ZMQ publisher if enabled
+            zmq_config = self.config.get('zmq', {})
+            if zmq_config.get('enabled', False):
+                zmq_address = zmq_config.get('pub_address', 'tcp://*:5555')
+                if 'zmq_publisher' in services:
+                    evaluator_service.zmq_publisher = services['zmq_publisher']
+                else:
+                    evaluator_service.initialize_zmq_publisher(zmq_address)
+        
         # Create optimizer interface
         self.optimizer = OptimizerInterface(
             optimizer_service=optimizer_service
@@ -320,14 +224,7 @@ class EventHandler:
         
         # Create evaluator interface
         self.evaluator = EvaluatorInterface(
-            evaluator_service=services.get('evaluator_service')
-        )
-        
-        # Create message broker
-        zmq_config = self.config.get('zmq', {})
-        self.message_broker = MessageBroker(
-            zmq_enabled=zmq_config.get('enabled', False),
-            zmq_publisher=services.get('zmq_publisher')
+            evaluator_service=evaluator_service
         )
         
         # Set up logging observer
@@ -347,7 +244,7 @@ class EventHandler:
         self._setup_observables()
         
         # Connect observers to observables based on event types
-        self._connect_observers_to_observables()
+        await self._connect_observers_to_observables()
 
         # Initialize market data if optimizer service is available
         if 'optimizer_service' in self.services:
@@ -359,12 +256,18 @@ class EventHandler:
             except Exception as e:
                 self.logger.error(f"Failed to initialize market data: {str(e)}")
         
+        # Initialize vault info if evaluator service is available
+        if 'evaluator_service' in self.services:
+            try:
+                self.logger.info("Initializing vault information...")
+                await self.services['evaluator_service'].initialize_vault_info()
+                self.logger.info("Vault information initialization complete")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize vault information: {str(e)}")
+        
         # Set up the Observer if Supabase service is available
         if 'supabase_service' in self.services:
             await self._setup_observer()
-        
-        # Start the message broker
-        self.message_broker.start()
         
         self.logger.info("Event handling system setup complete")
         
@@ -384,74 +287,64 @@ class EventHandler:
         
         self.logger.info(f"Registered observables: market_data, portfolio_state, vault")
     
-    def _connect_observers_to_observables(self) -> None:
+    async def _connect_observers_to_observables(self) -> None:
         """Connect observers to observables for relevant event types."""
         # Create handlers that route events through the optimization -> evaluation -> messaging pipeline
         
         # Market data events
-        def handle_market_data(event_data):
+        async def handle_market_data(event_data):
             # Ensure consistent naming - if timestamp exists but created_at doesn't, copy it over
             if 'timestamp' in event_data and 'created_at' not in event_data:
                 event_data['created_at'] = event_data['timestamp']
             
             # First pass through optimizer
-            opt_result = self.optimizer.handle_market_data_update(event_data)
+            opt_result = await self.optimizer.handle_market_data_update(event_data)
             # Then through evaluator
-            eval_result = self.evaluator.evaluate_optimization_result(opt_result)
-            # Finally publish via message broker
-            self.message_broker.publish(
-                'market_data_processed', 
-                eval_result, 
-                [self.logging_observer.handle_event]
-            )
+            eval_result = await self.evaluator.evaluate_optimization_result(opt_result)
+            # Log the result
+            if self.logging_observer:
+                self.logging_observer.handle_event('market_data_processed', eval_result)
         
         # Deposit events
-        def handle_deposit(event_data):
-            opt_result = self.optimizer.handle_deposit_event(event_data)
-            eval_result = self.evaluator.evaluate_optimization_result(opt_result)
-            self.message_broker.publish(
-                'deposit_processed', 
-                eval_result, 
-                [self.logging_observer.handle_event]
-            )
+        async def handle_deposit(event_data):
+            opt_result = await self.optimizer.handle_deposit_event(event_data)
+            eval_result = await self.evaluator.evaluate_optimization_result(opt_result)
+            if self.logging_observer:
+                self.logging_observer.handle_event('deposit_processed', eval_result)
         
         # Withdrawal events
-        def handle_withdrawal(event_data):
-            opt_result = self.optimizer.handle_withdrawal_event(event_data)
-            eval_result = self.evaluator.evaluate_optimization_result(opt_result)
-            self.message_broker.publish(
-                'withdrawal_processed', 
-                eval_result, 
-                [self.logging_observer.handle_event]
-            )
+        async def handle_withdrawal(event_data):
+            opt_result = await self.optimizer.handle_withdrawal_event(event_data)
+            eval_result = await self.evaluator.evaluate_optimization_result(opt_result)
+            if self.logging_observer:
+                self.logging_observer.handle_event('withdrawal_processed', eval_result)
         
         # Vault info events
-        def handle_vault_info(event_data):
-            opt_result = self.optimizer.handle_vault_info_update(event_data)
-            eval_result = self.evaluator.evaluate_optimization_result(opt_result)
-            self.message_broker.publish(
-                'vault_info_processed', 
-                eval_result, 
-                [self.logging_observer.handle_event]
-            )
+        async def handle_vault_info(event_data):
+            opt_result = await self.optimizer.handle_vault_info_update(event_data)
+            eval_result = await self.evaluator.evaluate_optimization_result(opt_result)
+            if self.logging_observer:
+                self.logging_observer.handle_event('vault_info_processed', eval_result)
         
         # Register specific handlers for each event type
         self.observer_manager.register_observer(
-            'portfolio_state', EventTypes.DEPOSIT_EVENT, handle_deposit
+            'portfolio_state', EventTypes.DEPOSIT_EVENT, 
+            lambda event_data: asyncio.create_task(handle_deposit(event_data))
         )
         
         self.observer_manager.register_observer(
-            'portfolio_state', EventTypes.WITHDRAWAL_EVENT, handle_withdrawal
+            'portfolio_state', EventTypes.WITHDRAWAL_EVENT, 
+            lambda event_data: asyncio.create_task(handle_withdrawal(event_data))
         )
         
         self.observer_manager.register_observer(
-            'vault', EventTypes.VAULT_INFO_RECORD, handle_vault_info
+            'vault', EventTypes.VAULT_INFO_RECORD, 
+            lambda event_data: asyncio.create_task(handle_vault_info(event_data))
         )
-        
         
         self.observer_manager.register_observer(
             'market_data', EventTypes.NEW_PERFORMANCE_HISTORY_RECORD, 
-            handle_market_data
+            lambda event_data: asyncio.create_task(handle_market_data(event_data))
         )
         
         self.logger.info("Connected observers to observables")
@@ -482,7 +375,7 @@ class EventHandler:
         """Get an observable by name."""
         return self.observer_manager.get_observable(name)
     
-    def trigger_market_data_update(self, data: Dict[str, Any]) -> None:
+    async def trigger_market_data_update(self, data: Dict[str, Any]) -> None:
         """Manually trigger a market data update.
         
         Args:
@@ -490,7 +383,7 @@ class EventHandler:
         """
         try:
             market_data_observable = self.observer_manager.get_observable('market_data')
-            market_data_observable.update_market_data(data)
+            await market_data_observable.update_market_data(data)
             self.logger.debug(f"Manually triggered market data update for pool {data.get('pool_id', 'unknown')}")
         except Exception as e:
             self.logger.error(f"Error triggering market data update: {str(e)}")
@@ -525,14 +418,6 @@ class EventHandler:
     async def shutdown(self) -> None:
         """Clean up resources and shut down the event handling system."""
         self.logger.info("Shutting down event handler")
-        
-        # Stop the message broker
-        if hasattr(self, 'message_broker'):
-            try:
-                self.message_broker.stop()
-                self.logger.info("Message broker stopped")
-            except Exception as e:
-                self.logger.error(f"Error stopping message broker: {str(e)}")
         
         # Stop the Observer
         if hasattr(self, 'observer'):

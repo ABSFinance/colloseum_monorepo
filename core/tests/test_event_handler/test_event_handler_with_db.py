@@ -66,7 +66,8 @@ class EventHandlerDBTest:
             },
             'zmq': {
                 'enabled': True,
-                'pub_address': 'tcp://*:5555'
+                'pub_address': 'tcp://*:5555',
+                'sub_address': 'tcp://localhost:5555'  # Add subscriber address
             }
         }
         
@@ -81,6 +82,11 @@ class EventHandlerDBTest:
         
         # Initialize the event handler
         self.event_handler = None
+        
+        # ZMQ subscriber for message verification
+        self.zmq_context = None
+        self.zmq_subscriber = None
+        self.received_messages = []
         
         logger.info("EventHandlerDBTest initialized")
     
@@ -103,17 +109,75 @@ class EventHandlerDBTest:
             return False
     
     def setup_zmq(self):
-        """Set up ZeroMQ publisher."""
+        """Set up ZeroMQ publisher and subscriber."""
         try:
+            # Set up publisher
             context = zmq.Context()
             publisher = context.socket(zmq.PUB)
             publisher.bind(self.config['zmq']['pub_address'])
             self.services['zmq_publisher'] = publisher
-            logger.info("ZeroMQ publisher set up successfully")
+            
+            # Set up subscriber
+            self.zmq_context = zmq.Context()
+            self.zmq_subscriber = self.zmq_context.socket(zmq.SUB)
+            self.zmq_subscriber.connect(self.config['zmq']['sub_address'])
+            self.zmq_subscriber.setsockopt_string(zmq.SUBSCRIBE, "")  # Subscribe to all topics
+            
+            # Start message collection in background
+            self.message_collection_task = asyncio.create_task(self.collect_zmq_messages())
+            
+            logger.info("ZeroMQ publisher and subscriber set up successfully")
             return True
         except Exception as e:
             logger.error(f"Failed to set up ZeroMQ: {str(e)}")
             return False
+    
+    async def collect_zmq_messages(self):
+        """Collect ZMQ messages in the background."""
+        while True:
+            try:
+                if self.zmq_subscriber:
+                    message = await asyncio.get_event_loop().run_in_executor(
+                        None, 
+                        lambda: self.zmq_subscriber.recv_string()
+                    )
+                    self.received_messages.append(message)
+                    logger.debug(f"Received ZMQ message: {message}")
+            except Exception as e:
+                logger.error(f"Error collecting ZMQ messages: {str(e)}")
+                break
+
+    async def verify_zmq_messages(self, expected_topics: List[str], timeout: float = 5.0) -> bool:
+        """Verify that expected ZMQ messages were received.
+        
+        Args:
+            expected_topics: List of expected message topics
+            timeout: Maximum time to wait for messages in seconds
+            
+        Returns:
+            True if all expected messages were received, False otherwise
+        """
+        start_time = time.time()
+        received_topics = set()
+        
+        while time.time() - start_time < timeout:
+            for message in self.received_messages:
+                try:
+                    print(f"message : {message}")
+                    topic, _ = message.split(' ', 1)
+                    received_topics.add(topic)
+                except:
+                    continue
+                    
+            if all(topic in received_topics for topic in expected_topics):
+                logger.info(f"All expected ZMQ messages received: {received_topics}")
+                return True
+                
+            await asyncio.sleep(0.1)
+            
+        missing_topics = set(expected_topics) - received_topics
+        logger.error(f"Timeout waiting for ZMQ messages. Missing topics: {missing_topics}")
+        return False
     
     async def setup_event_handler(self):
         """Set up the event handler system."""
@@ -236,6 +300,9 @@ class EventHandlerDBTest:
             return
 
         try:
+            # Clear received messages before test
+            self.received_messages = []
+            
             # Insert performance history records
             for i, record in enumerate(self.test_records['performance_history']):
                 logger.info(f"Inserting performance history record {i+1}/{len(self.test_records['performance_history'])}")
@@ -264,7 +331,16 @@ class EventHandlerDBTest:
             logger.info("Waiting for final events to propagate...")
             await asyncio.sleep(delay_between_inserts * 2)
             
-            logger.info("Test sequence completed")
+            # Verify ZMQ messages were received
+            expected_topics = [
+                f"reallocation.{pool_id}.no_change" for pool_id in self.test_pools
+            ]
+            if not await self.verify_zmq_messages(expected_topics):
+                logger.error("Failed to verify ZMQ messages")
+                return False
+            
+            logger.info("Test sequence completed successfully")
+            return True
             
         finally:
             # Clean up test data if requested
@@ -290,7 +366,15 @@ class EventHandlerDBTest:
                     self.services['zmq_publisher'].context.term()
                     logger.info("ZeroMQ publisher closed")
                 except Exception as e:
-                    logger.error(f"Error closing ZeroMQ: {str(e)}")
+                    logger.error(f"Error closing ZeroMQ publisher: {str(e)}")
+                    
+            if self.zmq_subscriber:
+                try:
+                    self.zmq_subscriber.close()
+                    self.zmq_context.term()
+                    logger.info("ZeroMQ subscriber closed")
+                except Exception as e:
+                    logger.error(f"Error closing ZeroMQ subscriber: {str(e)}")
                     
             # Clean up test data
             try:

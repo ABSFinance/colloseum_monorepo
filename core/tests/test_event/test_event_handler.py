@@ -244,7 +244,7 @@ class EventHandlerTest:
             logger.error(f"Error setting up EventHandler: {str(e)}")
             return False
     
-    def test_market_data_event(self) -> bool:
+    async def test_market_data_event(self) -> bool:
         """Test market data event handling."""
         try:
             logger.info("Testing market data event handling...")
@@ -261,7 +261,7 @@ class EventHandlerTest:
             }
             
             # Trigger the event
-            self.event_handler.trigger_market_data_update(market_data)
+            await self.event_handler.trigger_market_data_update(market_data)
             
             # Check if event was received by test observer
             time.sleep(1)  # Wait a moment for event to be processed

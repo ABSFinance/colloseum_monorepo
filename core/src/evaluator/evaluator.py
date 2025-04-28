@@ -198,6 +198,7 @@ class Evaluator:
                                 current_allocation[int(allocated_pool_id)] = float(amount)
                     
                     # Update the vault's current allocation
+                    print(f"current_allocation {current_allocation}")
                     self.vaults[pool_id]['current_allocation'] = current_allocation
                     self.logger.info(f"Updated current allocation for vault {pool_id} with {len(current_allocation)} allocated pools")
                     
@@ -236,8 +237,6 @@ class Evaluator:
             }
         else:
             self.vaults[pool_id]['vault_info'] = vault_info
-            
-        self.logger.info(f"Updated vault {pool_id} with strategy {vault_info.get('strategy', 'min_risk')}")
         
     def update_allocation(self, pool_id: str, allocation_data: Dict[int, float]) -> None:
         """Update current allocation for a vault.
@@ -289,10 +288,6 @@ class Evaluator:
                 'asset': pool_id,
                 'utilization': utilization
             })
-
-            self.logger.info(f"Overall utilization (median): {overall_utilization}")
-            self.logger.info(f"Current amount: {current_amount}")
-            self.logger.info(f"Target amount: {target_amount}")
         
         # Calculate overall utilization as the median of individual asset utilizations
         # This provides a more robust measure that isn't skewed by outliers
@@ -325,9 +320,10 @@ class Evaluator:
         
         # Check if there are any significant differences
         needs_reallocation = False
+        overall = 0
         
-        # Calculate total values for percentage calculations
-        total_current = sum(current_allocation.values())
+        print(f"current_allocation : {current_allocation}")
+        print(f"target_allocation : {target_allocation}")
         
         # Check each asset in both current and target allocations
         for pool_id in set(list(current_allocation.keys()) + list(target_allocation.keys())):
@@ -335,27 +331,36 @@ class Evaluator:
             target_amount = target_allocation.get(pool_id, 0.0)
             
             # Calculate absolute difference
-            difference = target_amount - current_amount
+            target_difference = target_amount - current_amount
+            current_difference = current_amount - target_amount
+            
+            # Handle division by zero cases
+            if target_amount == 0 and current_amount == 0:
+                # Both are zero, no difference
+                difference = 0
+            elif target_amount == 0:
+                # Target is zero but current is not, difference is 100%
+                difference = 1.0
+            elif current_amount == 0:
+                # Current is zero but target is not, difference is 100%
+                difference = 1.0
+            else:
+                # Normal case - calculate percentage difference
+                difference = max(target_difference / target_amount, current_difference / current_amount)
             
             # Skip insignificant differences (below threshold)
             if abs(difference) == 0:
                 continue
+            
+            overall += difference
                 
-            # Calculate percentage difference relative to total current allocation
-            if total_current > 0:
-                percentage_diff = abs(difference) / total_current
-            else:
-                percentage_diff = 1.0  # Default to 100% if current allocation is empty
-
-            print(f"Pool ID: {pool_id}, Percentage Difference: {percentage_diff}")
-                
-            # Only reallocate if difference exceeds threshold (e.g., 5%)
-            if percentage_diff >= self.reallocation_threshold:
-                needs_reallocation = True
-                reallocation_actions.append({
-                    'pool_id': pool_id,
-                    'amount': difference
-                })
+            reallocation_actions.append({
+                'pool_id': pool_id,
+                'amount': target_difference
+            })
+            
+        if overall / len(current_allocation) > self.reallocation_threshold:
+            needs_reallocation = True
                 
         return reallocation_actions, needs_reallocation
     
@@ -602,51 +607,6 @@ class Evaluator:
             # Calculate total reallocation amount (sum of absolute values)
             total_reallocation_amount = sum(abs(action['amount']) for action in reallocation_actions)
             reallocation_summary['total_reallocation_amount'] = total_reallocation_amount
-            
-            # If we have a valid Supabase client, save the reallocation to the database
-            if self.supabase_client:
-                try:
-                    # Save reallocation summary to the database
-                    # This is a placeholder for the actual database save operation
-                    self.logger.info(f"Saving reallocation summary for vault {pool_id} to database")
-                    
-                    # Save each reallocation action
-                    for action in reallocation_actions:
-                        # Prepare data for insertion
-                        allocation_data = {
-                            'pool_id': int(pool_id),
-                            'allocated_pool_id': int(action['pool_id']),
-                            'amount': float(action['amount']),
-                            'created_at': pd.Timestamp.now(UTC).isoformat()
-                        }
-                        
-                        # Insert into allocation history table
-                        await self.supabase_client.table('abs_vault_allocation_history') \
-                            .insert(allocation_data) \
-                            .execute()
-                            
-                    self.logger.info(f"Saved {len(reallocation_actions)} reallocation actions for vault {pool_id}")
-                    
-                    # Update the vault's current allocation
-                    new_allocation = dict(self.vaults[pool_id].get('current_allocation', {}))
-                    for action in reallocation_actions:
-                        action_pool_id = action['pool_id']
-                        action_amount = action['amount']
-                        
-                        # Initialize if not exist
-                        if action_pool_id not in new_allocation:
-                            new_allocation[action_pool_id] = 0.0
-                            
-                        # Update allocation
-                        new_allocation[action_pool_id] += action_amount
-                        
-                    # Update vault allocation
-                    self.vaults[pool_id]['current_allocation'] = new_allocation
-                    self.logger.info(f"Updated allocation for vault {pool_id}")
-                    
-                except Exception as e:
-                    self.logger.error(f"Error saving reallocation to database: {str(e)}")
-                    reallocation_summary['database_save_error'] = str(e)
             
             # Prepare result
             result = {

@@ -177,15 +177,19 @@ class Optimizer:
                 # Parse with explicit ISO8601 format to handle timezone information
                 df_row['timestamp_parsed'] = pd.to_datetime(df_row['created_at'])
                 
-                # Keep only the date part (year, month, day) if needed
-                # df_row['timestamp_parsed'] = df_row['timestamp_parsed'].dt.date
-                # Convert back to datetime for proper indexing if you used .date
-                # df_row['timestamp_parsed'] = pd.to_datetime(df_row['timestamp_parsed'])
+                # Ensure all timestamps are timezone-aware and in UTC
+                if df_row['timestamp_parsed'].dt.tz is None:
+                    df_row['timestamp_parsed'] = df_row['timestamp_parsed'].dt.tz_localize('UTC')
+                else:
+                    df_row['timestamp_parsed'] = df_row['timestamp_parsed'].dt.tz_convert('UTC')
                 
             except Exception as e:
                 # If parsing fails, log error and try generic parser with coercion
                 self.logger.warning(f"Timestamp parsing failed: {str(e)}")
                 df_row['timestamp_parsed'] = pd.to_datetime(df_row['created_at'], errors='coerce')
+                # Ensure coerced timestamps are also timezone-aware
+                if df_row['timestamp_parsed'].dt.tz is None:
+                    df_row['timestamp_parsed'] = df_row['timestamp_parsed'].dt.tz_localize('UTC')
             
             # Check for invalid timestamps
             if df_row['timestamp_parsed'].isna().any():
@@ -351,6 +355,25 @@ class Optimizer:
                 
                 # Ensure return values are numeric
                 try:
+                    # First ensure we have a proper DatetimeIndex
+                    if not isinstance(df.index, pd.DatetimeIndex):
+                        # Try to convert the index to datetime, handling timezone-aware datetimes
+                        try:
+                            # First convert to UTC if timezone-aware
+                            if hasattr(df.index, 'tz') and df.index.tz is not None:
+                                df.index = df.index.tz_convert('UTC')
+                            # Then convert to datetime64
+                            df.index = pd.to_datetime(df.index, utc=True)
+                        except Exception as e:
+                            self.logger.error(f"Failed to convert index to datetime for pool {pool_id}: {str(e)}")
+                            continue
+                    
+                    # Now ensure the index is timezone-aware and in UTC
+                    if df.index.tz is None:
+                        df.index = df.index.tz_localize('UTC')
+                    else:
+                        df.index = df.index.tz_convert('UTC')
+                    
                     # Convert apy column to numeric, forcing errors to NaN
                     numeric_returns = pd.to_numeric(df['apy'], errors='coerce')
                     
@@ -369,6 +392,9 @@ class Optimizer:
                         
                     # Create a DataFrame with the numeric values, explicitly as float64
                     returns = numeric_returns.astype(np.float64).to_frame(pool_id)
+                    
+                    # Handle duplicate timestamps by taking the last value
+                    returns = returns.groupby(returns.index).last()
                     
                     # Verify returns are numeric
                     if not pd.api.types.is_numeric_dtype(returns[pool_id]):
@@ -431,7 +457,7 @@ class Optimizer:
             self.logger.error(f"Error preparing returns data: {str(e)}")
             return pd.DataFrame()
         
-    def handle_market_data(self, data: Optional[Dict[str, Any]], vault_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def handle_market_data(self, data: Optional[Dict[str, Any]], vault_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Handle new market data and perform reoptimization.
         
         Args:
@@ -472,7 +498,7 @@ class Optimizer:
                 
                 for affected_vault_id in affected_vaults:
                     # Reoptimize each affected vault
-                    vault_result = self.handle_market_data(
+                    vault_result = await self.handle_market_data(
                         None,
                         self.vaults.get(affected_vault_id).get('vault_info')  # Pass the vault_info directly
                     )
@@ -736,7 +762,7 @@ class Optimizer:
                 
         return weights
             
-    def handle_vault_update(self, vault_info: Dict[str, Any], market_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def handle_vault_update(self, vault_info: Dict[str, Any], market_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Handle vault information updates (deposits/withdrawals/strategy changes).
         
         Args:
@@ -760,11 +786,11 @@ class Optimizer:
         
         # If market_data is provided, use it for optimization
         if market_data:
-            return self.handle_market_data(market_data, vault_info)
+            return await self.handle_market_data(market_data, vault_info)
         
         # Otherwise, use the vault_info for optimization if we have existing market data
         if pool_id in self.market_data:
-            return self.handle_market_data({'pool_id': pool_id}, vault_info)
+            return await self.handle_market_data({'pool_id': pool_id}, vault_info)
             
         return {
             'pool_id': pool_id,

@@ -37,7 +37,7 @@ class Observer:
         self.portfolio_state_table = portfolio_state_table
         self.vault_info_table = vault_info_table
         self.logger = logging.getLogger(f"{__name__}.Observer")
-        self.channels = {}  # Initialize as an empty dictionary
+        self.channel = self.supabase_client.channel('db-changed')
         self.is_running = False
         
         self.logger.info(f"Initialized Supabase listener for tables: {market_data_table}, {portfolio_state_table}, {vault_info_table}")
@@ -56,52 +56,35 @@ class Observer:
         self.is_running = True
         
         try:
-            # Create the channel
-            self.channels["performance_history"] = self.supabase_client.channel('performance_changes')
-            self.channels["allocation_history"] = self.supabase_client.channel('allocation_changes')
-            self.channels["vault_info_insert"] = self.supabase_client.channel('vault_info_insert')
-            self.channels["vault_info_update"] = self.supabase_client.channel('vault_info_update')
-
-            # Set up Supabase realtime subscription for market data table (performance history)
-            self.channels["performance_history"].on_postgres_changes(
+            
+            # Set up all subscriptions on the same channel
+            self.channel.on_postgres_changes(
                     event="INSERT",
                     schema="public",
                     table=self.market_data_table,
                     callback=self._handle_performance_history
-                )
-            
-            # Set up Supabase realtime subscription for portfolio state table (allocation history)
-            self.channels["allocation_history"].on_postgres_changes(
+                ).on_postgres_changes(
                     event="INSERT",
                     schema="public",
                     table=self.portfolio_state_table,
                     callback=self._handle_allocation_history
-                )
-            
-            # Set up Supabase realtime subscription for vault info table - INSERT events
-            self.channels["vault_info_insert"].on_postgres_changes(
+                ).on_postgres_changes(
                     event="INSERT",
                     schema="public",
                     table=self.vault_info_table,
                     callback=self._handle_vault_info
-                )
-            
-            # Set up Supabase realtime subscription for vault info table - UPDATE events
-            self.channels["vault_info_update"].on_postgres_changes(
+                ).on_postgres_changes(
                     event="UPDATE",
                     schema="public",
                     table=self.vault_info_table,
                     callback=self._handle_vault_info
                 )
             
-            # Subscribe to all channels
-            for channel_name, channel in self.channels.items():
-                self.logger.info(f"Subscribing to channel: {channel_name}")
-                await channel.subscribe()
-                # Wait a bit to ensure subscription is established
-                await asyncio.sleep(1)
+            # Subscribe to the channel
+            await self.channel.subscribe()
+            await asyncio.sleep(1)  # Wait for subscription to be established
             
-            self.logger.info("Supabase listener subscribed successfully to all channels")
+            self.logger.info("Supabase listener subscribed successfully to channel")
         except Exception as e:
             self.is_running = False
             self.logger.error(f"Failed to start Supabase listener: {str(e)}")
@@ -116,11 +99,8 @@ class Observer:
         self.logger.info("Stopping Supabase listener")
         
         try:
-            if self.channels:
-                for channel_name, channel in self.channels.items():
-                    self.logger.info(f"Unsubscribing from channel: {channel_name}")
-                    await channel.unsubscribe()
-                self.channels = {}
+            if self.channel:
+                self.channel.unsubscribe()
             
             self.is_running = False
             self.logger.info("Supabase listener stopped successfully")
