@@ -11,9 +11,9 @@ import {
     outputMintAddress,
     outputTokenProgram,
   } from "./variables";
-  import { JUPITER_SWAP, ORACLE } from "./constants";
+  import { JUPITER_SWAP, ORACLE } from "../constants";
   import { BN } from "@coral-xyz/anchor";
-  import { setupTokenAccount } from "../../utils/helper";
+  import { setupTokenAccount } from "../../../utils/helper";
   
   const JUP_ENDPOINT = "https://lite-api.jup.ag/swap/v1";
   

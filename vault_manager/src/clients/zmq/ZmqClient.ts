@@ -1,22 +1,24 @@
-import { Socket } from 'zmq';
+import * as zmq from 'zeromq';
 import { ZmqConfig, ZmqMessageHandler } from './types';
 
 export class ZmqClient {
-  private socket: Socket;
+  private socket: zmq.Subscriber;
   private messageHandler?: ZmqMessageHandler;
+  private address: string;
 
   constructor(config: ZmqConfig) {
-    this.socket = new Socket('sub');
-    this.socket.connect(config.address);
+    this.socket = new zmq.Subscriber();
+    this.address = config.address;
+    this.socket.connect(this.address);
     this.setupMessageHandler();
   }
 
-  private setupMessageHandler(): void {
-    this.socket.on('message', async (message: string) => {
+  private async setupMessageHandler(): Promise<void> {
+    for await (const [topic, message] of this.socket) {
       if (this.messageHandler) {
-        await this.messageHandler(message);
+        await this.messageHandler(message.toString());
       }
-    });
+    }
   }
 
   subscribe(topic: string): void {
@@ -28,6 +30,7 @@ export class ZmqClient {
   }
 
   async close(): Promise<void> {
+    await this.socket.disconnect(this.address);
     this.socket.close();
   }
 } 

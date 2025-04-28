@@ -1,8 +1,8 @@
-import { Socket } from 'zmq';
+import { Socket } from 'zeromq';
 
 export interface ZmqConfig {
   address: string;
-  options?: Socket.Options;
+  options?: Record<string, any>;
 }
 
 export interface ZmqMessageHandler {

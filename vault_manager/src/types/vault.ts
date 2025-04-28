@@ -1,24 +1,61 @@
+import { ReallocationAction } from './messages';
+
 export interface VaultState {
-  totalValue: number;
-  strategies: {
-    strategyId: string;
-    amount: number;
-  }[];
+  poolId: string;
+  currentAllocation: Allocation;
+  lastUpdated: Date;
+  status: VaultStatus;
+}
+
+export enum VaultStatus {
+  ACTIVE = 'active',
+  PENDING = 'pending',
+  PAUSED = 'paused',
+  CLOSED = 'closed'
 }
 
 export interface Allocation {
-  [poolId: string]: number;
+  assets: AssetAllocation[];
+  totalValue: number;
 }
 
-export type VaultStatus = 'active' | 'inactive' | 'pending' | 'error';
-
-export interface Transaction {
-  id: string;
-  type: 'deposit' | 'withdraw';
+export interface AssetAllocation {
+  assetId: string;
   amount: number;
-  poolId: string;
-  status: TransactionStatus;
-  timestamp: Date;
+  value: number;
+  percentage: number;
 }
 
-export type TransactionStatus = 'pending' | 'confirmed' | 'failed'; 
+export interface ReallocationPlan {
+  poolId: string;
+  actions: ReallocationAction[];
+  expectedAllocation: Allocation;
+  timestamp: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface ValidationError {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface ValidationWarning {
+  code: string;
+  message: string;
+  details?: Record<string, unknown>;
+}
+
+export interface ValidationResult {
+  isValid: boolean;
+  errors: ValidationError[];
+  warnings: ValidationWarning[];
+  timestamp: string;
+}
+
+export interface LiquidityInfo {
+  assetId: string;
+  available: number;
+  required: number;
+  sufficient: boolean;
+} 

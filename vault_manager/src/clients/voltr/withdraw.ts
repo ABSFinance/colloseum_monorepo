@@ -27,9 +27,9 @@ import {
   lookupTableAddress,
   useLookupTable,
   outputTokenProgram,
-} from "./variables";
+} from "./utils/variables";
 import { PROTOCOL_CONSTANTS } from "./constants";
-import { setupJupiterSwapForWithdrawStrategy } from "./setup-jupiter-swap";
+import { setupJupiterSwapForWithdrawStrategy } from "./utils/setup-jupiter-swap";
 
 const payerKpFile = fs.readFileSync(managerFilePath, "utf-8");
 const payerKpData = JSON.parse(payerKpFile);
@@ -37,17 +37,184 @@ const payerSecret = Uint8Array.from(payerKpData);
 const payerKp = Keypair.fromSecretKey(payerSecret);
 const payer = payerKp.publicKey;
 
-const vault = new PublicKey(vaultAddress);
-const vaultAssetMint = new PublicKey(assetMintAddress);
-const vaultAssetTokenProgram = new PublicKey(assetTokenProgram);
 const vaultOutputMint = new PublicKey(outputMintAddress);
 const vaultOutputTokenProgram = new PublicKey(outputTokenProgram);
 
-const connection = new Connection(heliusRpcUrl);
-const vc = new VoltrClient(connection);
-const withdrawAmount = new BN(withdrawAssetAmountPerStrategy);
+
+/**
+ * Parameters for withdrawing from a Solend strategy
+ */
+export interface SolendWithdrawParams {
+  /** The Voltr client */ 
+  vc: VoltrClient,
+  /** The connection */
+  connection: Connection,
+  /** The vault address */
+  vault: PublicKey,
+  /** The payer keypair */
+  payerKp: Keypair,
+  /** The asset token program */
+  vaultAssetTokenProgram: PublicKey,
+  /** The output mint */
+  vaultAssetMint: PublicKey,
+  /** The amount to withdraw */
+  withdrawAmount: BN;
+  /** The program ID of the Solend protocol */
+  protocolProgram: PublicKey;
+  /** The token account of the counterparty */
+  counterPartyTa: PublicKey;
+  /** The lending market account */
+  lendingMarket: PublicKey;
+  /** The reserve account */
+  reserve: PublicKey;
+  /** The collateral mint account */
+  collateralMint: PublicKey;
+  /** The Pyth oracle account */
+  pythOracle: PublicKey;
+  /** The Switchboard oracle account */
+  switchboardOracle: PublicKey;
+  /** Optional lookup table addresses */
+  lookupTableAddresses?: string[];
+}
+
+/**
+ * Parameters for withdrawing from a Marginfi strategy
+ */
+export interface MarginfiWithdrawParams {
+  /** The Voltr client */ 
+  vc: VoltrClient,
+  /** The connection */
+  connection: Connection,
+  /** The vault address */
+  vault: PublicKey,
+  /** The payer keypair */
+  payerKp: Keypair,
+  /** The asset token program */
+  vaultAssetTokenProgram: PublicKey,
+  /** The output mint */
+  vaultAssetMint: PublicKey,
+  /** The amount to withdraw */
+  withdrawAmount: BN;
+  /** The program ID of the Marginfi protocol */
+  protocolProgram: PublicKey;
+  /** The bank account */
+  bank: PublicKey;
+  /** The marginfi account */
+  marginfiAccount: PublicKey;
+  /** The marginfi group account */
+  marginfiGroup: PublicKey;
+  /** The oracle account */
+  oracle: PublicKey;
+  /** Optional lookup table addresses */
+  lookupTableAddresses?: string[];
+}
+
+/**
+ * Parameters for withdrawing from a Klend strategy
+ */
+export interface KlendWithdrawParams {
+  /** The Voltr client */ 
+  vc: VoltrClient,
+  /** The connection */
+  connection: Connection,
+  /** The vault address */
+  vault: PublicKey,
+  /** The payer keypair */
+  payerKp: Keypair,
+  /** The asset token program */
+  vaultAssetTokenProgram: PublicKey,
+  /** The output mint */
+  vaultAssetMint: PublicKey,
+  /** The amount to withdraw */
+  withdrawAmount: BN;
+  /** The program ID of the Klend protocol */
+  protocolProgram: PublicKey;
+  /** The lending market account */
+  lendingMarket: PublicKey;
+  /** The reserve account */
+  reserve: PublicKey;
+  /** The scope prices account */
+  scopePrices: PublicKey;
+  /** Optional lookup table addresses */
+  lookupTableAddresses?: string[];
+}
+
+/**
+ * Parameters for withdrawing from a Drift strategy
+ */
+export interface DriftWithdrawParams {
+  /** The Voltr client */ 
+  vc: VoltrClient,
+  /** The connection */
+  connection: Connection,
+  /** The vault address */
+  vault: PublicKey,
+  /** The payer keypair */
+  payerKp: Keypair,
+  /** The asset token program */
+  vaultAssetTokenProgram: PublicKey,
+  /** The output mint */
+  vaultAssetMint: PublicKey,
+  /** The amount to withdraw */
+  withdrawAmount: BN;
+  /** The program ID of the Drift protocol */
+  protocolProgram: PublicKey;
+  /** The state account */
+  state: PublicKey;
+  /** The market index */
+  marketIndex: BN;
+  /** The sub account ID */
+  subAccountId: BN;
+  /** The oracle account */
+  oracle: PublicKey;
+  /** Optional lookup table addresses */
+  lookupTableAddresses?: string[];
+}
+
+/**
+ * Union type for all withdraw strategy parameters
+ */
+export type WithdrawStrategyParams = 
+  | { type: 'solend', params: SolendWithdrawParams }
+  | { type: 'marginfi', params: MarginfiWithdrawParams }
+  | { type: 'klend', params: KlendWithdrawParams }
+  | { type: 'drift', params: DriftWithdrawParams };
+
+/**
+ * Simplified parameters for withdrawing from any strategy
+ * Uses a consistent format for all strategy types
+ */
+export interface WithdrawParams {
+  /** The Voltr client */ 
+  vc: VoltrClient,
+  /** The connection */
+  connection: Connection,
+  /** The vault address */
+  vault: PublicKey,
+  /** The payer keypair */
+  payerKp: Keypair,
+  /** The asset token program */
+  vaultAssetTokenProgram: PublicKey,
+  /** The output mint */
+  vaultAssetMint: PublicKey,
+  /** The strategy type: 'solend', 'marginfi', 'klend', or 'drift' */
+  type: 'solend' | 'marginfi' | 'klend' | 'drift';
+  /** The token to withdraw (e.g., 'USDC', 'USDT') */
+  token: string;
+  /** The address related to the strategy (e.g., lending market address) */
+  address: string;
+  /** The amount to withdraw (in the smallest denomination, e.g., 1000000 = 1 USDC) */
+  amount: number;
+}
 
 const withdrawSolendStrategy = async (
+  vc: VoltrClient,
+  connection: Connection,
+  vault: PublicKey,
+  vaultAssetTokenProgram: PublicKey,
+  vaultAssetMint: PublicKey,
+  payerKp: Keypair,
+  withdrawAmount: BN,
   protocolProgram: PublicKey,
   counterPartyTa: PublicKey,
   lendingMarket: PublicKey,
@@ -68,7 +235,7 @@ const withdrawSolendStrategy = async (
 
   const vaultCollateralAta = await setupTokenAccount(
     connection,
-    payer,
+    payerKp.publicKey,
     collateralMint,
     vaultStrategyAuth,
     transactionIxs
@@ -76,7 +243,7 @@ const withdrawSolendStrategy = async (
 
   const _vaultStrategyAssetAta = await setupTokenAccount(
     connection,
-    payer,
+    payerKp.publicKey,
     vaultAssetMint,
     vaultStrategyAuth,
     transactionIxs,
@@ -128,7 +295,7 @@ const withdrawSolendStrategy = async (
   const createWithdrawStrategyIx = await vc.createWithdrawStrategyIx(
     { withdrawAmount, additionalArgs },
     {
-      manager: payer,
+      manager: payerKp.publicKey,
       vault,
       vaultAssetMint,
       assetTokenProgram: new PublicKey(assetTokenProgram),
@@ -147,9 +314,17 @@ const withdrawSolendStrategy = async (
     addressLookupTableAccounts
   );
   console.log("Solend strategy withdrawn with signature:", txSig);
+  return txSig;
 };
 
 const withdrawMarginfiStrategy = async (
+  vc: VoltrClient,
+  connection: Connection,
+  vault: PublicKey,
+  vaultAssetTokenProgram: PublicKey,
+  vaultAssetMint: PublicKey,
+  payerKp: Keypair,
+  withdrawAmount: BN,
   protocolProgram: PublicKey,
   bank: PublicKey,
   marginfiAccount: PublicKey,
@@ -173,7 +348,7 @@ const withdrawMarginfiStrategy = async (
 
   const vaultStrategyAssetAta = await setupTokenAccount(
     connection,
-    payer,
+    payerKp.publicKey,
     vaultAssetMint,
     vaultStrategyAuth,
     transactionIxs,
@@ -222,7 +397,7 @@ const withdrawMarginfiStrategy = async (
   const createWithdrawStrategyIx = await vc.createWithdrawStrategyIx(
     { withdrawAmount, additionalArgs },
     {
-      manager: payer,
+      manager: payerKp.publicKey,
       vault,
       vaultAssetMint,
       assetTokenProgram: new PublicKey(assetTokenProgram),
@@ -241,9 +416,17 @@ const withdrawMarginfiStrategy = async (
     addressLookupTableAccounts
   );
   console.log("Marginfi strategy withdrawn with signature:", txSig);
+  return txSig;
 };
 
 const withdrawKlendStrategy = async (
+  vc: VoltrClient,
+  connection: Connection,
+  vault: PublicKey,
+  vaultAssetTokenProgram: PublicKey,
+  vaultAssetMint: PublicKey,
+  payerKp: Keypair,
+  withdrawAmount: BN,
   protocolProgram: PublicKey,
   lendingMarket: PublicKey,
   reserve: PublicKey,
@@ -278,7 +461,7 @@ const withdrawKlendStrategy = async (
 
   const userDestinationCollateral = await setupTokenAccount(
     connection,
-    payer,
+    payerKp.publicKey,
     reserveCollateralMint,
     vaultStrategyAuth,
     transactionIxs
@@ -286,7 +469,7 @@ const withdrawKlendStrategy = async (
 
   const _vaultStrategyAssetAta = await setupTokenAccount(
     connection,
-    payer,
+    payerKp.publicKey,
     vaultAssetMint,
     vaultStrategyAuth,
     transactionIxs,
@@ -346,7 +529,7 @@ const withdrawKlendStrategy = async (
   const createWithdrawStrategyIx = await vc.createWithdrawStrategyIx(
     { withdrawAmount, additionalArgs },
     {
-      manager: payer,
+      manager: payerKp.publicKey,
       vault,
       vaultAssetMint,
       assetTokenProgram: new PublicKey(assetTokenProgram),
@@ -365,9 +548,17 @@ const withdrawKlendStrategy = async (
     addressLookupTableAccounts
   );
   console.log("Klend strategy withdrawn with signature:", txSig);
+  return txSig;
 };
 
 const withdrawDriftStrategy = async (
+  vc: VoltrClient,
+  connection: Connection,
+  vault: PublicKey,
+  vaultAssetTokenProgram: PublicKey,
+  vaultAssetMint: PublicKey,
+  payerKp: Keypair,
+  withdrawAmount: BN,
   protocolProgram: PublicKey,
   state: PublicKey,
   marketIndex: BN,
@@ -411,7 +602,7 @@ const withdrawDriftStrategy = async (
 
   const _vaultStrategyAssetAta = await setupTokenAccount(
     connection,
-    payer,
+    payerKp.publicKey,
     vaultAssetMint,
     vaultStrategyAuth,
     transactionIxs,
@@ -466,7 +657,7 @@ const withdrawDriftStrategy = async (
       additionalArgs,
     },
     {
-      manager: payer,
+      manager: payerKp.publicKey,
       vault,
       vaultAssetMint,
       assetTokenProgram: new PublicKey(assetTokenProgram),
@@ -485,58 +676,262 @@ const withdrawDriftStrategy = async (
     addressLookupTableAccounts
   );
   console.log("Drift strategy withdrawn with signature:", txSig);
+  return txSig;
 };
 
-// const main = async () => {
-//   await withdrawSolendStrategy(
-//     new PublicKey(PROTOCOL_CONSTANTS.SOLEND.PROGRAM_ID),
-//     new PublicKey(PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET.USDC.COUNTERPARTY_TA),
-//     new PublicKey(PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET.LENDING_MARKET),
-//     new PublicKey(PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET.USDC.RESERVE),
-//     new PublicKey(PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET.USDC.COLLATERAL_MINT),
-//     new PublicKey(PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET.USDC.PYTH_ORACLE),
-//     new PublicKey(
-//       PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET.USDC.SWITCHBOARD_ORACLE
-//     ),
-//     useLookupTable
-//       ? [
-//           ...PROTOCOL_CONSTANTS.SOLEND.LOOKUP_TABLE_ADDRESSES,
-//           lookupTableAddress,
-//         ]
-//       : [...PROTOCOL_CONSTANTS.SOLEND.LOOKUP_TABLE_ADDRESSES]
-//   );
-//   await withdrawMarginfiStrategy(
-//     new PublicKey(PROTOCOL_CONSTANTS.MARGINFI.PROGRAM_ID),
-//     new PublicKey(PROTOCOL_CONSTANTS.MARGINFI.MAIN_MARKET.USDC.BANK),
-//     new PublicKey(marginfiAccount),
-//     new PublicKey(PROTOCOL_CONSTANTS.MARGINFI.MAIN_MARKET.GROUP),
-//     new PublicKey(PROTOCOL_CONSTANTS.MARGINFI.MAIN_MARKET.USDC.ORACLE),
-//     useLookupTable
-//       ? [
-//           ...PROTOCOL_CONSTANTS.MARGINFI.LOOKUP_TABLE_ADDRESSES,
-//           lookupTableAddress,
-//         ]
-//       : [...PROTOCOL_CONSTANTS.MARGINFI.LOOKUP_TABLE_ADDRESSES]
-//   );
-//   await withdrawKlendStrategy(
-//     new PublicKey(PROTOCOL_CONSTANTS.KLEND.PROGRAM_ID),
-//     new PublicKey(PROTOCOL_CONSTANTS.KLEND.MAIN_MARKET.LENDING_MARKET),
-//     new PublicKey(PROTOCOL_CONSTANTS.KLEND.MAIN_MARKET.USDC.RESERVE),
-//     new PublicKey(PROTOCOL_CONSTANTS.KLEND.SCOPE_ORACLE),
-//     useLookupTable
-//       ? [...PROTOCOL_CONSTANTS.KLEND.LOOKUP_TABLE_ADDRESSES, lookupTableAddress]
-//       : [...PROTOCOL_CONSTANTS.KLEND.LOOKUP_TABLE_ADDRESSES]
-//   );
-//   await withdrawDriftStrategy(
-//     new PublicKey(PROTOCOL_CONSTANTS.DRIFT.PROGRAM_ID),
-//     new PublicKey(PROTOCOL_CONSTANTS.DRIFT.SPOT.STATE),
-//     new BN(PROTOCOL_CONSTANTS.DRIFT.SPOT.USDC.MARKET_INDEX),
-//     new BN(PROTOCOL_CONSTANTS.DRIFT.SUB_ACCOUNT_ID),
-//     new PublicKey(PROTOCOL_CONSTANTS.DRIFT.SPOT.USDC.ORACLE),
-//     useLookupTable
-//       ? [...PROTOCOL_CONSTANTS.DRIFT.LOOKUP_TABLE_ADDRESSES, lookupTableAddress]
-//       : [...PROTOCOL_CONSTANTS.DRIFT.LOOKUP_TABLE_ADDRESSES]
-//   );
-// };
+/**
+ * Wrapper function to withdraw from a strategy using simplified parameters
+ * @param params The simplified parameters for the strategy
+ * @returns A promise that resolves to the transaction signature
+ */
+export const withdraw = async (params: WithdrawParams): Promise<string> => {
+  try {
+    const {vc, connection, vault, vaultAssetTokenProgram, vaultAssetMint, payerKp, type, token, address, amount } = params;
+    
+    // Override the global withdraw amount with the provided amount
+    const customWithdrawAmount = new BN(amount);
+    
+    // Convert token to uppercase for comparison
+    const tokenUpperCase = token.toUpperCase();
+    
+    switch (type) {
+      case 'solend': {
+        // Create the address from the provided address string
+        const lendingMarket = new PublicKey(address);
+        
+        // Check if token is supported for Solend
+        if (tokenUpperCase !== 'USDC' && tokenUpperCase !== 'USDT' && 
+            tokenUpperCase !== 'SOL' && tokenUpperCase !== 'USDS') {
+          throw new Error(`Token ${token} not supported for Solend strategy`);
+        }
+        
+        // Get token-specific constants using type safety
+        const solendConstants = PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET[tokenUpperCase as 'USDC' | 'USDT' | 'SOL' | 'USDS'];
+        
+        const counterPartyTa = new PublicKey(solendConstants.COUNTERPARTY_TA);
+        const reserve = new PublicKey(solendConstants.RESERVE);
+        const collateralMint = new PublicKey(solendConstants.COLLATERAL_MINT);
+        const pythOracle = new PublicKey(solendConstants.PYTH_ORACLE);
+        const switchboardOracle = new PublicKey(solendConstants.SWITCHBOARD_ORACLE);
+        
+        const lookupTableAddresses = useLookupTable
+          ? [...PROTOCOL_CONSTANTS.SOLEND.LOOKUP_TABLE_ADDRESSES, lookupTableAddress]
+          : [...PROTOCOL_CONSTANTS.SOLEND.LOOKUP_TABLE_ADDRESSES];
+        
+        const txSig = await withdrawSolendStrategy(
+          vc,
+          connection,
+          vault,
+          vaultAssetTokenProgram,
+          vaultAssetMint,
+          payerKp,
+          customWithdrawAmount,
+          new PublicKey(PROTOCOL_CONSTANTS.SOLEND.PROGRAM_ID),
+          counterPartyTa,
+          lendingMarket,
+          reserve,
+          collateralMint,
+          pythOracle,
+          switchboardOracle,
+          lookupTableAddresses
+        );
+        
+        return txSig;
+      }
+      
+      case 'marginfi': {
+        // Create the address from the provided address string (bank address)
+        const bank = new PublicKey(address);
+        
+        // Check if token is supported for Marginfi
+        if (tokenUpperCase !== 'USDC' && tokenUpperCase !== 'USDT' && 
+            tokenUpperCase !== 'SOL' && tokenUpperCase !== 'PYUSD' && 
+            tokenUpperCase !== 'USDS') {
+          throw new Error(`Token ${token} not supported for Marginfi strategy`);
+        }
+        
+        // Get token-specific constants using type safety
+        const marginfiConstants = PROTOCOL_CONSTANTS.MARGINFI.MAIN_MARKET[tokenUpperCase as 'USDC' | 'USDT' | 'SOL' | 'PYUSD' | 'USDS'];
+        
+        const marginfiGroupAddress = new PublicKey(PROTOCOL_CONSTANTS.MARGINFI.MAIN_MARKET.GROUP);
+        const oracle = new PublicKey(marginfiConstants.ORACLE);
+        
+        const lookupTableAddresses = useLookupTable
+          ? [...PROTOCOL_CONSTANTS.MARGINFI.LOOKUP_TABLE_ADDRESSES, lookupTableAddress]
+          : [...PROTOCOL_CONSTANTS.MARGINFI.LOOKUP_TABLE_ADDRESSES];
+        
+        const txSig = await withdrawMarginfiStrategy(
+          vc,
+          connection,
+          vault,
+          vaultAssetTokenProgram,
+          vaultAssetMint,
+          payerKp,
+          customWithdrawAmount,
+          new PublicKey(PROTOCOL_CONSTANTS.MARGINFI.PROGRAM_ID),
+          bank,
+          new PublicKey(marginfiAccount),
+          marginfiGroupAddress,
+          oracle,
+          lookupTableAddresses
+        );
+        
+        return txSig;
+      }
+      
+      case 'klend': {
+        // Create the address from the provided address string (lending market)
+        const lendingMarket = new PublicKey(address);
+        
+        // Check if token is supported for Klend
+        if (tokenUpperCase !== 'USDC' && tokenUpperCase !== 'USDT' && 
+            tokenUpperCase !== 'SOL' && tokenUpperCase !== 'PYUSD' && 
+            tokenUpperCase !== 'USDS' && tokenUpperCase !== 'USDG') {
+          throw new Error(`Token ${token} not supported for Klend strategy`);
+        }
+        
+        // Get token-specific constants using type safety
+        const klendConstants = PROTOCOL_CONSTANTS.KLEND.MAIN_MARKET[tokenUpperCase as 'USDC' | 'USDT' | 'SOL' | 'PYUSD' | 'USDS' | 'USDG'];
+        
+        const reserve = new PublicKey(klendConstants.RESERVE);
+        const scopePrices = new PublicKey(PROTOCOL_CONSTANTS.KLEND.SCOPE_ORACLE);
+        
+        const lookupTableAddresses = useLookupTable
+          ? [...PROTOCOL_CONSTANTS.KLEND.LOOKUP_TABLE_ADDRESSES, lookupTableAddress]
+          : [...PROTOCOL_CONSTANTS.KLEND.LOOKUP_TABLE_ADDRESSES];
+        
+        const txSig = await withdrawKlendStrategy(
+          vc,
+          connection,
+          vault,
+          vaultAssetTokenProgram,
+          vaultAssetMint,
+          payerKp,
+          customWithdrawAmount,
+          new PublicKey(PROTOCOL_CONSTANTS.KLEND.PROGRAM_ID),
+          lendingMarket,
+          reserve,
+          scopePrices,
+          lookupTableAddresses
+        );
+        
+        return txSig;
+      }
+      
+      case 'drift': {
+        // Create the address from the provided address string (state)
+        const state = new PublicKey(address);
+        
+        // Check if token is supported for Drift
+        if (tokenUpperCase !== 'USDC' && tokenUpperCase !== 'USDT' && 
+            tokenUpperCase !== 'SOL' && tokenUpperCase !== 'PYUSD' && 
+            tokenUpperCase !== 'USDS') {
+          throw new Error(`Token ${token} not supported for Drift strategy`);
+        }
+        
+        // Get token-specific constants using type safety
+        const driftConstants = PROTOCOL_CONSTANTS.DRIFT.SPOT[tokenUpperCase as 'USDC' | 'USDT' | 'SOL' | 'PYUSD' | 'USDS'];
+        
+        const marketIndex = new BN(driftConstants.MARKET_INDEX);
+        const oracle = new PublicKey(driftConstants.ORACLE);
+        const subAccountId = new BN(PROTOCOL_CONSTANTS.DRIFT.SUB_ACCOUNT_ID);
+        
+        const lookupTableAddresses = useLookupTable
+          ? [...PROTOCOL_CONSTANTS.DRIFT.LOOKUP_TABLE_ADDRESSES, lookupTableAddress]
+          : [...PROTOCOL_CONSTANTS.DRIFT.LOOKUP_TABLE_ADDRESSES];
+        
+        const txSig = await withdrawDriftStrategy(
+          vc,
+          connection,
+          vault,
+          vaultAssetTokenProgram,
+          vaultAssetMint,
+          payerKp,
+          customWithdrawAmount,
+          new PublicKey(PROTOCOL_CONSTANTS.DRIFT.PROGRAM_ID),
+          state,
+          marketIndex,
+          subAccountId,
+          oracle,
+          lookupTableAddresses
+        );
+        
+        return txSig;
+      }
+      
+      default:
+        throw new Error(`Strategy type ${type} not supported`);
+    }
+  } catch (error) {
+    console.error(`Error withdrawing from ${params.type} strategy:`, error);
+    throw error;
+  }
+};
 
-// main();
+/**
+ * Main function to withdraw from all strategies
+ */
+export const main = async () => {
+  const connection = new Connection(heliusRpcUrl);
+  const vc = new VoltrClient(connection);
+  const vault = new PublicKey(vaultAddress);
+  const vaultAssetTokenProgramPubkey = new PublicKey(assetTokenProgram);
+  const vaultAssetMintPubkey = new PublicKey(outputMintAddress);
+  
+  const strategies = [
+    {
+      type: 'solend' as const,
+      token: 'USDC',
+      address: PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET.LENDING_MARKET,
+      amount: withdrawAssetAmountPerStrategy,
+      vaultAssetTokenProgram: vaultAssetTokenProgramPubkey,
+      vaultAssetMint: vaultAssetMintPubkey,
+    },
+    {
+      type: 'marginfi' as const,
+      token: 'USDC',
+      address: PROTOCOL_CONSTANTS.MARGINFI.MAIN_MARKET.USDC.BANK,
+      amount: withdrawAssetAmountPerStrategy,
+      vaultAssetTokenProgram: vaultAssetTokenProgramPubkey,
+      vaultAssetMint: vaultAssetMintPubkey,
+    },
+    {
+      type: 'klend' as const,
+      token: 'USDC',
+      address: PROTOCOL_CONSTANTS.KLEND.MAIN_MARKET.LENDING_MARKET,
+      amount: withdrawAssetAmountPerStrategy,
+      vaultAssetTokenProgram: vaultAssetTokenProgramPubkey,
+      vaultAssetMint: vaultAssetMintPubkey,
+    },
+    {
+      type: 'drift' as const,
+      token: 'USDC',
+      address: PROTOCOL_CONSTANTS.DRIFT.SPOT.STATE,
+      amount: withdrawAssetAmountPerStrategy,
+      vaultAssetTokenProgram: vaultAssetTokenProgramPubkey,
+      vaultAssetMint: vaultAssetMintPubkey,
+    },
+  ];
+
+  for (const strategy of strategies) {
+    try {
+      const result = await withdraw({
+        vc,
+        connection,
+        vault,
+        payerKp,
+        type: strategy.type,
+        token: strategy.token,
+        address: strategy.address,
+        amount: strategy.amount,
+        vaultAssetTokenProgram: strategy.vaultAssetTokenProgram,
+        vaultAssetMint: strategy.vaultAssetMint,
+      });
+      console.log(`${strategy.type} strategy withdraw result:`, result);
+    } catch (error) {
+      console.error(`Error withdrawing from ${strategy.type} strategy:`, error);
+    }
+  }
+};
+
+main();

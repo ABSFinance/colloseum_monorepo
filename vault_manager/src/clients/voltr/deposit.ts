@@ -27,26 +27,134 @@ import {
   outputTokenProgram,
   lookupTableAddress,
   useLookupTable,
-} from "./variables";
+} from "./utils/variables";
 import { PROTOCOL_CONSTANTS } from "./constants";
-import { setupJupiterSwapForDepositStrategy } from "./setup-jupiter-swap";
+import { setupJupiterSwapForDepositStrategy } from "./utils/setup-jupiter-swap";
 
-const payerKpFile = fs.readFileSync(managerFilePath, "utf-8");
-const payerKpData = JSON.parse(payerKpFile);
-const payerSecret = Uint8Array.from(payerKpData);
-const payerKp = Keypair.fromSecretKey(payerSecret);
-const payer = payerKp.publicKey;
+/**
+ * Parameters for depositing to a Solend strategy
+ */
+export interface SolendStrategyParams {
+  /** The Voltr client */ 
+  vc: VoltrClient,
+  /** The connection */
+  connection: Connection,
+  /** The amount to deposit */
+  depositAmount: BN;
+  /** The program ID of the Solend protocol */
+  protocolProgram: PublicKey;
+  /** The token account of the counterparty */
+  counterPartyTa: PublicKey;
+  /** The lending market account */
+  lendingMarket: PublicKey;
+  /** The reserve account */
+  reserve: PublicKey;
+  /** The collateral mint account */
+  collateralMint: PublicKey;
+  /** The Pyth oracle account */
+  pythOracle: PublicKey;
+  /** The Switchboard oracle account */
+  switchboardOracle: PublicKey;
+  /** Optional lookup table addresses */
+  lookupTableAddresses?: string[];
+}
 
-const vault = new PublicKey(vaultAddress);
-const vaultAssetMint = new PublicKey(assetMintAddress);
-const vaultAssetTokenProgram = new PublicKey(assetTokenProgram);
-const vaultOutputMint = new PublicKey(outputMintAddress);
+/**
+ * Parameters for depositing to a Marginfi strategy
+ */
+export interface MarginfiStrategyParams {
+  /** The Voltr client */ 
+  vc: VoltrClient,
+  /** The connection */
+  connection: Connection,
+  /** The amount to deposit */
+  depositAmount: BN;
+  /** The program ID of the Marginfi protocol */
+  protocolProgram: PublicKey;
+  /** The bank account */
+  bank: PublicKey;
+  /** The marginfi account */
+  marginfiAccount: PublicKey;
+  /** The marginfi group account */
+  marginfiGroup: PublicKey;
+  /** Optional lookup table addresses */
+  lookupTableAddresses?: string[];
+}
 
-const connection = new Connection(heliusRpcUrl);
-const vc = new VoltrClient(connection);
-const depositAmount = new BN(depositAssetAmountPerStrategy);
+/**
+ * Parameters for depositing to a Klend strategy
+ */
+export interface KlendStrategyParams {
+  /** The Voltr client */ 
+  vc: VoltrClient,
+  /** The connection */
+  connection: Connection,
+  /** The amount to deposit */
+  depositAmount: BN;
+  /** The program ID of the Klend protocol */
+  protocolProgram: PublicKey;
+  /** The lending market account */
+  lendingMarket: PublicKey;
+  /** The reserve account */
+  reserve: PublicKey;
+  /** The scope prices account */
+  scopePrices: PublicKey;
+  /** Optional lookup table addresses */
+  lookupTableAddresses?: string[];
+}
 
-const depositSolendStrategy = async (
+/**
+ * Parameters for depositing to a Drift strategy
+ */
+export interface DriftStrategyParams {
+  /** The Voltr client */ 
+  vc: VoltrClient,
+  /** The connection */
+  connection: Connection,
+  /** The amount to deposit */
+  depositAmount: BN;
+  /** The program ID of the Drift protocol */
+  protocolProgram: PublicKey;
+  /** The state account */
+  state: PublicKey;
+  /** The market index */
+  marketIndex: BN;
+  /** The sub account ID */
+  subAccountId: BN;
+  /** The oracle account */
+  oracle: PublicKey;
+  /** Optional lookup table addresses */
+  lookupTableAddresses?: string[];
+}
+
+/**
+ * Union type for all strategy parameters
+ */
+export type DepositStrategyParams = 
+  | { type: 'solend', params: SolendStrategyParams }
+  | { type: 'marginfi', params: MarginfiStrategyParams }
+  | { type: 'klend', params: KlendStrategyParams }
+  | { type: 'drift', params: DriftStrategyParams };
+
+/**
+ * Deposits assets to a Solend strategy
+ * @param protocolProgram The program ID of the Solend protocol
+ * @param counterPartyTa The token account of the counterparty
+ * @param lendingMarket The lending market account
+ * @param reserve The reserve account
+ * @param collateralMint The collateral mint account
+ * @param pythOracle The Pyth oracle account
+ * @param switchboardOracle The Switchboard oracle account
+ * @param lookupTableAddresses Optional lookup table addresses
+ */
+export const depositSolendStrategy = async (
+  vc: VoltrClient,
+  connection: Connection,
+  vault: PublicKey,
+  vaultAssetTokenProgram: PublicKey,
+  vaultAssetMint: PublicKey,
+  payerKp: Keypair,
+  depositAmount: BN,
   protocolProgram: PublicKey,
   counterPartyTa: PublicKey,
   lendingMarket: PublicKey,
@@ -72,7 +180,7 @@ const depositSolendStrategy = async (
 
   const vaultCollateralAta = await setupTokenAccount(
     connection,
-    payer,
+    payerKp.publicKey,
     collateralMint,
     vaultStrategyAuth,
     transactionIxs
@@ -80,7 +188,7 @@ const depositSolendStrategy = async (
 
   const _vaultStrategyAssetAta = await setupTokenAccount(
     connection,
-    payer,
+    payerKp.publicKey,
     vaultAssetMint,
     vaultStrategyAuth,
     transactionIxs,
@@ -116,7 +224,7 @@ const depositSolendStrategy = async (
       connection,
       depositAmount,
       new BN(0),
-      payer,
+      payerKp.publicKey,
       vaultStrategyAuth,
       additionalArgs,
       remainingAccounts,
@@ -133,7 +241,7 @@ const depositSolendStrategy = async (
       additionalArgs,
     },
     {
-      manager: payer,
+      manager: payerKp.publicKey,
       vault,
       vaultAssetMint,
       assetTokenProgram: new PublicKey(assetTokenProgram),
@@ -151,10 +259,26 @@ const depositSolendStrategy = async (
     [],
     addressLookupTableAccounts
   );
-  console.log("Solend strategy deposited with signature:", txSig);
+  
+  return txSig;
 };
 
-const depositMarginfiStrategy = async (
+/**
+ * Deposits assets to a Marginfi strategy
+ * @param protocolProgram The program ID of the Marginfi protocol
+ * @param bank The bank account
+ * @param marginfiAccount The marginfi account
+ * @param marginfiGroup The marginfi group account
+ * @param lookupTableAddresses Optional lookup table addresses
+ */
+export const depositMarginfiStrategy = async (
+  vc: VoltrClient,
+  connection: Connection,
+  vault: PublicKey,
+  vaultAssetTokenProgram: PublicKey,
+  vaultAssetMint: PublicKey,
+  payerKp: Keypair,
+  depositAmount: BN,
   protocolProgram: PublicKey,
   bank: PublicKey,
   marginfiAccount: PublicKey,
@@ -177,7 +301,7 @@ const depositMarginfiStrategy = async (
 
   const _vaultStrategyAssetAta = await setupTokenAccount(
     connection,
-    payer,
+    payerKp.publicKey,
     vaultAssetMint,
     vaultStrategyAuth,
     transactionIxs,
@@ -204,7 +328,7 @@ const depositMarginfiStrategy = async (
       connection,
       depositAmount,
       new BN(0),
-      payer,
+      payerKp.publicKey,
       vaultStrategyAuth,
       additionalArgs,
       remainingAccounts,
@@ -221,7 +345,7 @@ const depositMarginfiStrategy = async (
       additionalArgs,
     },
     {
-      manager: payer,
+      manager: payerKp.publicKey,
       vault,
       vaultAssetMint,
       assetTokenProgram: new PublicKey(assetTokenProgram),
@@ -239,10 +363,26 @@ const depositMarginfiStrategy = async (
     [],
     addressLookupTableAccounts
   );
-  console.log("Marginfi strategy deposited with signature:", txSig);
+  
+  return txSig;
 };
 
-const depositKlendStrategy = async (
+/**
+ * Deposits assets to a Klend strategy
+ * @param protocolProgram The program ID of the Klend protocol
+ * @param lendingMarket The lending market account
+ * @param reserve The reserve account
+ * @param scopePrices The scope prices account
+ * @param lookupTableAddresses Optional lookup table addresses
+ */
+export const depositKlendStrategy = async (
+  vc: VoltrClient,
+  connection: Connection,
+  vault: PublicKey,
+  vaultAssetTokenProgram: PublicKey,
+  vaultAssetMint: PublicKey,
+  payerKp: Keypair,
+  depositAmount: BN,
   protocolProgram: PublicKey,
   lendingMarket: PublicKey,
   reserve: PublicKey,
@@ -258,7 +398,7 @@ const depositKlendStrategy = async (
     [
       Buffer.from("reserve_liq_supply"),
       lendingMarket.toBuffer(),
-      vaultOutputMint.toBuffer(),
+      vaultAssetMint.toBuffer(),
     ],
     protocolProgram
   );
@@ -273,7 +413,7 @@ const depositKlendStrategy = async (
     [
       Buffer.from("reserve_coll_mint"),
       lendingMarket.toBuffer(),
-      vaultOutputMint.toBuffer(),
+      vaultAssetMint.toBuffer(),
     ],
     protocolProgram
   );
@@ -282,7 +422,7 @@ const depositKlendStrategy = async (
 
   const userDestinationCollateral = await setupTokenAccount(
     connection,
-    payer,
+    payerKp.publicKey,
     reserveCollateralMint,
     vaultStrategyAuth,
     transactionIxs
@@ -290,7 +430,7 @@ const depositKlendStrategy = async (
 
   const _vaultStrategyAssetAta = await setupTokenAccount(
     connection,
-    payer,
+    payerKp.publicKey,
     vaultAssetMint,
     vaultStrategyAuth,
     transactionIxs,
@@ -330,7 +470,7 @@ const depositKlendStrategy = async (
       connection,
       depositAmount,
       new BN(0),
-      payer,
+      payerKp.publicKey,
       vaultStrategyAuth,
       additionalArgs,
       remainingAccounts,
@@ -347,7 +487,7 @@ const depositKlendStrategy = async (
       additionalArgs,
     },
     {
-      manager: payer,
+      manager: payerKp.publicKey,
       vault,
       vaultAssetMint,
       assetTokenProgram: new PublicKey(assetTokenProgram),
@@ -365,10 +505,27 @@ const depositKlendStrategy = async (
     [],
     addressLookupTableAccounts
   );
-  console.log("Klend strategy deposited with signature:", txSig);
+  
+  return txSig;
 };
 
-const depositDriftStrategy = async (
+/**
+ * Deposits assets to a Drift strategy
+ * @param protocolProgram The program ID of the Drift protocol
+ * @param state The state account
+ * @param marketIndex The market index
+ * @param subAccountId The sub account ID
+ * @param oracle The oracle account
+ * @param lookupTableAddresses Optional lookup table addresses
+ */
+export const depositDriftStrategy = async (
+  vc: VoltrClient,
+  connection: Connection,
+  vault: PublicKey,
+  vaultAssetTokenProgram: PublicKey,
+  vaultAssetMint: PublicKey,
+  payerKp: Keypair,
+  depositAmount: BN,
   protocolProgram: PublicKey,
   state: PublicKey,
   marketIndex: BN,
@@ -412,7 +569,7 @@ const depositDriftStrategy = async (
 
   const _vaultStrategyAssetAta = await setupTokenAccount(
     connection,
-    payer,
+    payerKp.publicKey,
     vaultAssetMint,
     vaultStrategyAuth,
     transactionIxs,
@@ -443,7 +600,7 @@ const depositDriftStrategy = async (
       connection,
       depositAmount,
       new BN(0),
-      payer,
+      payerKp.publicKey,
       vaultStrategyAuth,
       additionalArgs,
       remainingAccounts,
@@ -460,7 +617,7 @@ const depositDriftStrategy = async (
       additionalArgs,
     },
     {
-      manager: payer,
+      manager: payerKp.publicKey,
       vault,
       vaultAssetMint,
       assetTokenProgram: new PublicKey(assetTokenProgram),
@@ -478,58 +635,297 @@ const depositDriftStrategy = async (
     [],
     addressLookupTableAccounts
   );
-  console.log("Drift strategy deposited with signature:", txSig);
+  
+  return txSig;
 };
 
-// const main = async () => {
-//   await depositSolendStrategy(
-//     new PublicKey(PROTOCOL_CONSTANTS.SOLEND.PROGRAM_ID),
-//     new PublicKey(PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET.USDC.COUNTERPARTY_TA),
-//     new PublicKey(PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET.LENDING_MARKET),
-//     new PublicKey(PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET.USDC.RESERVE),
-//     new PublicKey(PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET.USDC.COLLATERAL_MINT),
-//     new PublicKey(PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET.USDC.PYTH_ORACLE),
-//     new PublicKey(
-//       PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET.USDC.SWITCHBOARD_ORACLE
-//     ),
-//     useLookupTable
-//       ? [
-//           ...PROTOCOL_CONSTANTS.SOLEND.LOOKUP_TABLE_ADDRESSES,
-//           lookupTableAddress,
-//         ]
-//       : [...PROTOCOL_CONSTANTS.SOLEND.LOOKUP_TABLE_ADDRESSES]
-//   );
-//   await depositMarginfiStrategy(
-//     new PublicKey(PROTOCOL_CONSTANTS.MARGINFI.PROGRAM_ID),
-//     new PublicKey(PROTOCOL_CONSTANTS.MARGINFI.MAIN_MARKET.USDC.BANK),
-//     new PublicKey(marginfiAccount),
-//     new PublicKey(PROTOCOL_CONSTANTS.MARGINFI.MAIN_MARKET.GROUP),
-//     useLookupTable
-//       ? [
-//           ...PROTOCOL_CONSTANTS.MARGINFI.LOOKUP_TABLE_ADDRESSES,
-//           lookupTableAddress,
-//         ]
-//       : [...PROTOCOL_CONSTANTS.MARGINFI.LOOKUP_TABLE_ADDRESSES]
-//   );
-//   await depositKlendStrategy(
-//     new PublicKey(PROTOCOL_CONSTANTS.KLEND.PROGRAM_ID),
-//     new PublicKey(PROTOCOL_CONSTANTS.KLEND.MAIN_MARKET.LENDING_MARKET),
-//     new PublicKey(PROTOCOL_CONSTANTS.KLEND.MAIN_MARKET.USDC.RESERVE),
-//     new PublicKey(PROTOCOL_CONSTANTS.KLEND.SCOPE_ORACLE),
-//     useLookupTable
-//       ? [...PROTOCOL_CONSTANTS.KLEND.LOOKUP_TABLE_ADDRESSES, lookupTableAddress]
-//       : [...PROTOCOL_CONSTANTS.KLEND.LOOKUP_TABLE_ADDRESSES]
-//   );
-//   await depositDriftStrategy(
-//     new PublicKey(PROTOCOL_CONSTANTS.DRIFT.PROGRAM_ID),
-//     new PublicKey(PROTOCOL_CONSTANTS.DRIFT.SPOT.STATE),
-//     new BN(PROTOCOL_CONSTANTS.DRIFT.SPOT.USDC.MARKET_INDEX),
-//     new BN(PROTOCOL_CONSTANTS.DRIFT.SUB_ACCOUNT_ID),
-//     new PublicKey(PROTOCOL_CONSTANTS.DRIFT.SPOT.USDC.ORACLE),
-//     useLookupTable
-//       ? [...PROTOCOL_CONSTANTS.DRIFT.LOOKUP_TABLE_ADDRESSES, lookupTableAddress]
-//       : [...PROTOCOL_CONSTANTS.DRIFT.LOOKUP_TABLE_ADDRESSES]
-//   );
+/**
+ * Simplified parameters for depositing to any strategy
+ * Uses a consistent format for all strategy types
+ */
+export interface DepositParams {
+  /** The Voltr client */ 
+  vc: VoltrClient,
+  /** The connection */
+  connection: Connection,
+  /** The vault address */
+  vault: PublicKey,
+  /** The payer keypair */
+  payerKp: Keypair,
+  /** The asset token program */
+  vaultAssetTokenProgram: PublicKey,
+  /** The output mint */
+  vaultAssetMint: PublicKey,
+  /** The strategy type: 'solend', 'marginfi', 'klend', or 'drift' */
+  type: 'solend' | 'marginfi' | 'klend' | 'drift';
+  /** The token to deposit (e.g., 'USDC', 'USDT') */
+  token: string;
+  /** The address where to deposit (e.g., lending market address) */
+  address: string;
+  /** The amount to deposit (in the smallest denomination, e.g., 1000000 = 1 USDC) */
+  amount: number;
+}
+
+/**
+ * Wrapper function to deposit to a strategy using simplified parameters
+ * @param params The simplified parameters for the strategy
+ * @returns A promise that resolves to the transaction signature
+ */
+export const deposit = async (params: DepositParams): Promise<string> => {
+  try {
+    const {vc, connection, vault, vaultAssetTokenProgram, vaultAssetMint, payerKp, type, token, address, amount } = params;
+    
+    // Override the global deposit amount with the provided amount
+    const customDepositAmount = new BN(amount);
+    
+    // Convert token to uppercase for comparison
+    const tokenUpperCase = token.toUpperCase();
+    
+    switch (type) {
+      case 'solend': {
+        // Create the address from the provided address string
+        const lendingMarket = new PublicKey(address);
+        
+        // Check if token is supported for Solend
+        if (tokenUpperCase !== 'USDC' && tokenUpperCase !== 'USDT' && 
+            tokenUpperCase !== 'SOL' && tokenUpperCase !== 'USDS') {
+          throw new Error(`Token ${token} not supported for Solend strategy`);
+        }
+        
+        // Get token-specific constants using type safety
+        const solendConstants = PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET[tokenUpperCase as 'USDC' | 'USDT' | 'SOL' | 'USDS'];
+        
+        const counterPartyTa = new PublicKey(solendConstants.COUNTERPARTY_TA);
+        const reserve = new PublicKey(solendConstants.RESERVE);
+        const collateralMint = new PublicKey(solendConstants.COLLATERAL_MINT);
+        const pythOracle = new PublicKey(solendConstants.PYTH_ORACLE);
+        const switchboardOracle = new PublicKey(solendConstants.SWITCHBOARD_ORACLE);
+        
+        const lookupTableAddresses = useLookupTable
+          ? [...PROTOCOL_CONSTANTS.SOLEND.LOOKUP_TABLE_ADDRESSES, lookupTableAddress]
+          : [...PROTOCOL_CONSTANTS.SOLEND.LOOKUP_TABLE_ADDRESSES];
+        
+        // Create modified version of depositSolendStrategy that uses the custom amount
+        const txSig = await depositSolendStrategy(
+          vc,
+          connection,
+          vault,
+          vaultAssetTokenProgram,
+          vaultAssetMint,
+          payerKp,
+          customDepositAmount,
+          new PublicKey(PROTOCOL_CONSTANTS.SOLEND.PROGRAM_ID),
+          counterPartyTa,
+          lendingMarket,
+          reserve,
+          collateralMint,
+          pythOracle,
+          switchboardOracle,
+          lookupTableAddresses
+        );
+        
+        return txSig;
+      }
+      
+      case 'marginfi': {
+        // Create the address from the provided address string (bank address)
+        const bank = new PublicKey(address);
+        
+        // Check if token is supported for Marginfi
+        if (tokenUpperCase !== 'USDC' && tokenUpperCase !== 'USDT' && 
+            tokenUpperCase !== 'SOL' && tokenUpperCase !== 'PYUSD' && 
+            tokenUpperCase !== 'USDS') {
+          throw new Error(`Token ${token} not supported for Marginfi strategy`);
+        }
+        
+        // Get token-specific constants using type safety
+        const marginfiConstants = PROTOCOL_CONSTANTS.MARGINFI.MAIN_MARKET[tokenUpperCase as 'USDC' | 'USDT' | 'SOL' | 'PYUSD' | 'USDS'];
+        
+        const marginfiGroupAddress = new PublicKey(PROTOCOL_CONSTANTS.MARGINFI.MAIN_MARKET.GROUP);
+        
+        const lookupTableAddresses = useLookupTable
+          ? [...PROTOCOL_CONSTANTS.MARGINFI.LOOKUP_TABLE_ADDRESSES, lookupTableAddress]
+          : [...PROTOCOL_CONSTANTS.MARGINFI.LOOKUP_TABLE_ADDRESSES];
+        
+        // Create modified version of depositMarginfiStrategy that uses the custom amount
+        const txSig = await depositMarginfiStrategy(
+          vc,
+          connection,
+          vault,
+          vaultAssetTokenProgram,
+          vaultAssetMint,
+          payerKp,
+          customDepositAmount,
+          new PublicKey(PROTOCOL_CONSTANTS.MARGINFI.PROGRAM_ID),
+          bank,
+          new PublicKey(marginfiAccount),
+          marginfiGroupAddress,
+          lookupTableAddresses
+        );
+        
+        return txSig;
+      }
+      
+      case 'klend': {
+        // Create the address from the provided address string (lending market)
+        const lendingMarket = new PublicKey(address);
+        
+        // Check if token is supported for Klend
+        if (tokenUpperCase !== 'USDC' && tokenUpperCase !== 'USDT' && 
+            tokenUpperCase !== 'SOL' && tokenUpperCase !== 'PYUSD' && 
+            tokenUpperCase !== 'USDS' && tokenUpperCase !== 'USDG') {
+          throw new Error(`Token ${token} not supported for Klend strategy`);
+        }
+        
+        // Get token-specific constants using type safety
+        const klendConstants = PROTOCOL_CONSTANTS.KLEND.MAIN_MARKET[tokenUpperCase as 'USDC' | 'USDT' | 'SOL' | 'PYUSD' | 'USDS' | 'USDG'];
+        
+        const reserve = new PublicKey(klendConstants.RESERVE);
+        const scopePrices = new PublicKey(PROTOCOL_CONSTANTS.KLEND.SCOPE_ORACLE);
+        
+        const lookupTableAddresses = useLookupTable
+          ? [...PROTOCOL_CONSTANTS.KLEND.LOOKUP_TABLE_ADDRESSES, lookupTableAddress]
+          : [...PROTOCOL_CONSTANTS.KLEND.LOOKUP_TABLE_ADDRESSES];
+        
+        // Create modified version of depositKlendStrategy that uses the custom amount
+        const txSig = await depositKlendStrategy(
+          vc,
+          connection,
+          vault,
+          vaultAssetTokenProgram,
+          vaultAssetMint,
+          payerKp,
+          customDepositAmount,
+          new PublicKey(PROTOCOL_CONSTANTS.KLEND.PROGRAM_ID),
+          lendingMarket,
+          reserve,
+          scopePrices,
+          lookupTableAddresses
+        );
+        
+        return txSig;
+      }
+      
+      case 'drift': {
+        // Create the address from the provided address string (state)
+        const state = new PublicKey(address);
+        
+        // Check if token is supported for Drift
+        if (tokenUpperCase !== 'USDC' && tokenUpperCase !== 'USDT' && 
+            tokenUpperCase !== 'SOL' && tokenUpperCase !== 'PYUSD' && 
+            tokenUpperCase !== 'USDS') {
+          throw new Error(`Token ${token} not supported for Drift strategy`);
+        }
+        
+        // Get token-specific constants using type safety
+        const driftConstants = PROTOCOL_CONSTANTS.DRIFT.SPOT[tokenUpperCase as 'USDC' | 'USDT' | 'SOL' | 'PYUSD' | 'USDS'];
+        
+        const marketIndex = new BN(driftConstants.MARKET_INDEX);
+        const oracle = new PublicKey(driftConstants.ORACLE);
+        const subAccountId = new BN(PROTOCOL_CONSTANTS.DRIFT.SUB_ACCOUNT_ID);
+        
+        const lookupTableAddresses = useLookupTable
+          ? [...PROTOCOL_CONSTANTS.DRIFT.LOOKUP_TABLE_ADDRESSES, lookupTableAddress]
+          : [...PROTOCOL_CONSTANTS.DRIFT.LOOKUP_TABLE_ADDRESSES];
+        
+        // Create modified version of depositDriftStrategy that uses the custom amount
+        const txSig = await depositDriftStrategy(
+          vc,
+          connection,
+          vault,
+          vaultAssetTokenProgram,
+          vaultAssetMint,
+          payerKp,
+          customDepositAmount,
+          new PublicKey(PROTOCOL_CONSTANTS.DRIFT.PROGRAM_ID),
+          state,
+          marketIndex,
+          subAccountId,
+          oracle,
+          lookupTableAddresses
+        );
+        
+        return txSig;
+      }
+      
+      default:
+        throw new Error(`Strategy type ${type} not supported`);
+    }
+  } catch (error) {
+    console.error(`Error depositing to ${params.type} strategy:`, error);
+    throw error;
+  }
+};
+
+
+// /**
+//  * Main function to deposit to all strategies
+//  */
+// export const main = async () => {
+//   const connection = new Connection(heliusRpcUrl);
+//   const vc = new VoltrClient(connection);
+//   const vault = new PublicKey(vaultAddress);
+//   const payerKpFile = fs.readFileSync(managerFilePath, "utf-8");
+// const payerKpData = JSON.parse(payerKpFile);
+// const payerSecret = Uint8Array.from(payerKpData);
+// const payerKp = Keypair.fromSecretKey(payerSecret);
+//   const strategies = [
+//     {
+//       type: 'solend' as const,
+//       token: 'USDC',
+//       address: '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8',
+//       amount: 1000000,
+//       vaultAssetTokenProgram: new PublicKey(assetTokenProgram),
+//       vaultAssetMint: new PublicKey(outputMintAddress),
+//     },
+//     {
+//       type: 'marginfi' as const,
+//       token: 'USDC',
+//       address: '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8',
+//       amount: 1000000,
+//       vaultAssetTokenProgram: new PublicKey(assetTokenProgram),
+//       vaultAssetMint: new PublicKey(outputMintAddress),
+//     },
+//     {
+//       type: 'klend' as const,
+//       token: 'USDC',
+//       address: '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8',
+//       amount: 1000000,
+//       vaultAssetTokenProgram: new PublicKey(assetTokenProgram),
+//       vaultAssetMint: new PublicKey(outputMintAddress),
+//     },
+//     {
+//       type: 'drift' as const,
+//       token: 'USDC',
+//       address: '675kPX9MHTjS2zt1qfr1NYHuzeLXfQM9H24wFSUt1Mp8',
+//       amount: 1000000,
+//       vaultAssetTokenProgram: new PublicKey(assetTokenProgram),
+//       vaultAssetMint: new PublicKey(outputMintAddress),
+//     },
+//   ];
+
+//   for (const strategy of strategies) {
+//     try {
+//       const result = await deposit({
+//         vc,
+//         connection,
+//         vault,
+//         payerKp,
+//         type: strategy.type,
+//         token: strategy.token,
+//         address: strategy.address,
+//         amount: strategy.amount,
+//         vaultAssetTokenProgram: strategy.vaultAssetTokenProgram,
+//         vaultAssetMint: strategy.vaultAssetMint,
+//       });
+//       console.log(`${strategy.type} strategy result:`, result);
+//     } catch (error) {
+//       console.error(`Error depositing to ${strategy.type} strategy:`, error);
+//     }
+//   }
 // };
 
-// main();
+// // Run the main function if this file is executed directly
+// if (require.main === module) {
+//   main().catch(console.error);
+// }
