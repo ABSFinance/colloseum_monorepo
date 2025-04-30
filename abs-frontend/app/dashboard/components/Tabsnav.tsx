@@ -17,7 +17,7 @@ export function TabNavigation({ openPositions, closedPositions, vaults }: TabNav
   return (
     <Tabs defaultValue="open" value={activeTab} onValueChange={setActiveTab} className="w-full text-white">
       <TabsList className="bg-zinc-900 w-full mb-6 p-1 rounded-md">
-        <TabsTrigger value="open" className="flex-1 data-[state=active]:bg-zinc-800  data-[state=active]:text-white p-4">
+        <TabsTrigger value="open" className="flex-1 text-gray-400 data-[state=active]:bg-zinc-800  data-[state=active]:text-white p-4">
           Open Positions
         </TabsTrigger>
         <TabsTrigger value="closed" className="flex-1 text-gray-400 data-[state=active]:bg-zinc-800 data-[state=active]:text-white p-4">
