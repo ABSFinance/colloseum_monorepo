@@ -9,6 +9,10 @@ import {
   LiquidityInfo
 } from '../types/vault';
 import { SolanaClient } from '../clients/solana/SolanaClient';
+import { VoltrClient } from '@voltr/vault-sdk';
+
+const { getPosition } = require('../clients/voltr/position');
+
 
 /**
  * Validator responsible for validating reallocation plans
@@ -50,21 +54,16 @@ export class Validator {
       errors.push(...constraintErrors);
       
       // Verify liquidity
-      const liquidityResult = await this.verifyLiquidity(plan);
-      const insufficientLiquidity = liquidityResult.filter(item => !item.sufficient);
+      const hasLiquidity = await this.verifyLiquidity(plan);
       
-      if (insufficientLiquidity.length > 0) {
-        for (const item of insufficientLiquidity) {
-          errors.push({
-            code: 'INSUFFICIENT_LIQUIDITY',
-            message: `Insufficient liquidity for asset ${item.assetId}. Required: ${item.required}, Available: ${item.available}`,
-            details: {
-              assetId: item.assetId,
-              required: item.required,
-              available: item.available
-            }
-          });
-        }
+      if (!hasLiquidity) {
+        errors.push({
+          code: 'INSUFFICIENT_LIQUIDITY',
+          message: `Insufficient liquidity for reallocation plan.`,
+          details: {
+            poolId: plan.poolId
+          }
+        });
       }
       
       // Check for duplicates
@@ -106,37 +105,44 @@ export class Validator {
   /**
    * Verifies available liquidity for the reallocation
    * @param plan - Reallocation plan to validate
-   * @returns Promise resolving to liquidity information for each asset
+   * @returns Promise resolving to boolean indicating if there is sufficient liquidity
    */
-  async verifyLiquidity(plan: ReallocationPlan): Promise<LiquidityInfo[]> {
-    const liquidityInfo: LiquidityInfo[] = [];
-    
-    for (const action of plan.actions) {
-      // Mock implementation - in a real scenario, this would query token balances
-      // from the blockchain or use a market liquidity oracle
-      try {
-        // For demonstration - in a real implementation this would use proper wallet addresses
-        const dummyPublicKey = new PublicKey('11111111111111111111111111111111');
-        const available = await this.solanaClient.getBalance(dummyPublicKey);
-        
-        liquidityInfo.push({
-          assetId: action.poolId, // Using poolId as assetId for this example
-          required: action.amount,
-          available,
-          sufficient: available >= action.amount
-        });
-      } catch (error) {
-        console.error(`Error verifying liquidity for ${action.poolId}:`, error);
-        liquidityInfo.push({
-          assetId: action.poolId,
-          required: action.amount,
-          available: 0,
-          sufficient: false
-        });
+  async verifyLiquidity(vc: VoltrClient, vault: PublicKey, plan: ReallocationPlan): Promise<boolean> {
+    try {
+      // Import the getPosition function directly to avoid module import issues
+      
+      const total_position = await getPosition(vc, vault, vault_asset_mint, strategy);
+      
+      for (const action of plan.actions) {
+        try {
+          if (action.poolType === "drift_vault") {
+            total_position.drift = total_position.drift.subn(action.amount);
+          } else if (action.poolType === "klend_vault") {
+            total_position.klend = total_position.klend.subn(action.amount);
+          } else if (action.poolType === "solend_vault") {
+            total_position.solend = total_position.solend.subn(action.amount);
+          } else if (action.poolType === "marginfi_vault") {
+            total_position.marginfi = total_position.marginfi.subn(action.amount);
+          }
+          
+          // Check if any position would go negative
+          if (total_position.drift.isNeg() || 
+              total_position.klend.isNeg() || 
+              total_position.solend.isNeg() || 
+              total_position.marginfi.isNeg()) {
+            return false;
+          }
+        } catch (error) {
+          console.error(`Error verifying liquidity for ${action.poolId}:`, error);
+          return false;
+        }
       }
+      
+      return true;
+    } catch (error) {
+      console.error('Error verifying liquidity:', error);
+      return false;
     }
-    
-    return liquidityInfo;
   }
 
   /**

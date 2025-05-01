@@ -1,0 +1,158 @@
+import { Connection, PublicKey } from "@solana/web3.js";
+import {
+  LENDING_ADAPTOR_PROGRAM_ID,
+  SEEDS,
+  VoltrClient,
+} from "@voltr/vault-sdk";
+import { BN } from "@coral-xyz/anchor";
+
+import { PROTOCOL_CONSTANTS } from "./constants";
+
+const findAndFetchStrategyPosition = async (
+  vc: VoltrClient,
+  vault: PublicKey,
+  strategy: PublicKey
+) => {
+  const strategyInitReceipt = vc.findStrategyInitReceipt(vault, strategy);
+  const strategyAccount = await vc.fetchStrategyInitReceiptAccount(
+    strategyInitReceipt
+  );
+
+  return strategyAccount.positionValue;
+};
+
+export const getSolendStrategyPosition = async (vc: VoltrClient, vault: PublicKey, counterPartyTa: PublicKey) => {
+  const [strategy] = PublicKey.findProgramAddressSync(
+    [SEEDS.STRATEGY, counterPartyTa.toBuffer()],
+    LENDING_ADAPTOR_PROGRAM_ID
+  );
+
+  return findAndFetchStrategyPosition(vc, vault, strategy);
+};
+
+export const getMarginfiStrategyPosition = async (
+  vc: VoltrClient,
+  vault: PublicKey,
+  protocolProgram: PublicKey,
+  bank: PublicKey
+) => {
+  const [counterPartyTa] = PublicKey.findProgramAddressSync(
+    [Buffer.from("liquidity_vault"), bank.toBuffer()],
+    protocolProgram
+  );
+
+  const [strategy] = PublicKey.findProgramAddressSync(
+    [SEEDS.STRATEGY, counterPartyTa.toBuffer()],
+    LENDING_ADAPTOR_PROGRAM_ID
+  );
+
+  return findAndFetchStrategyPosition(vc, vault, strategy);
+};
+
+export const getKlendStrategyPosition = async (
+  vc: VoltrClient,
+  vault: PublicKey,
+  vaultAssetMint: PublicKey,
+  protocolProgram: PublicKey,
+  lendingMarket: PublicKey
+) => {
+  const [counterPartyTa] = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("reserve_liq_supply"),
+      lendingMarket.toBuffer(),
+      vaultAssetMint.toBuffer(),
+    ],
+    protocolProgram
+  );
+
+  const [strategy] = PublicKey.findProgramAddressSync(
+    [SEEDS.STRATEGY, counterPartyTa.toBuffer()],
+    LENDING_ADAPTOR_PROGRAM_ID
+  );    
+
+  return findAndFetchStrategyPosition(vc, vault, strategy);
+};
+
+export const getDriftStrategyPosition = async (
+  vc: VoltrClient,
+  vault: PublicKey,
+  vaultAssetMint: PublicKey,
+  protocolProgram: PublicKey,
+  marketIndex: BN
+) => {
+  const [counterPartyTa] = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("spot_market_vault"),
+      marketIndex.toArrayLike(Buffer, "le", 2),
+    ],
+    protocolProgram
+  );
+
+  const [strategy] = PublicKey.findProgramAddressSync(
+    [SEEDS.STRATEGY, counterPartyTa.toBuffer()],
+    LENDING_ADAPTOR_PROGRAM_ID
+  );
+
+  return findAndFetchStrategyPosition(vc, vault, strategy);
+};
+
+export const getVaultIdlePosition = async (vc: VoltrClient, vault: PublicKey, summedPositionValues: BN) => {
+  const vaultAccount = await vc.fetchVaultAccount(vault);
+  const vaultTotalValue = vaultAccount.asset.totalValue;
+  const vaultIdleValue = vaultTotalValue.sub(summedPositionValues);
+  return vaultIdleValue;
+};
+
+export const getPosition = async (vc: VoltrClient, vault: PublicKey, vault_asset_mint: PublicKey, strategy: PublicKey) => {
+  const [
+    solendStrategyPosition,
+    marginfiStrategyPosition,
+    klendStrategyPosition,
+    driftStrategyPosition,
+  ]: BN[] = await Promise.all([
+    getSolendStrategyPosition(
+      vc,
+      vault,
+      new PublicKey(PROTOCOL_CONSTANTS.SOLEND.MAIN_MARKET.USDC.COUNTERPARTY_TA)
+    ),
+    getMarginfiStrategyPosition(
+      vc,
+      vault,
+      new PublicKey(PROTOCOL_CONSTANTS.MARGINFI.PROGRAM_ID),
+      new PublicKey(PROTOCOL_CONSTANTS.MARGINFI.MAIN_MARKET.USDC.BANK)
+    ),
+    getKlendStrategyPosition(
+      vc,
+      vault,
+      vault_asset_mint,
+      new PublicKey(PROTOCOL_CONSTANTS.KLEND.PROGRAM_ID),
+      new PublicKey(PROTOCOL_CONSTANTS.KLEND.MAIN_MARKET.LENDING_MARKET)
+    ),
+    getDriftStrategyPosition(
+      vc,
+      vault,
+      vault_asset_mint,
+      new PublicKey(PROTOCOL_CONSTANTS.DRIFT.PROGRAM_ID),
+      new BN(PROTOCOL_CONSTANTS.DRIFT.SPOT.USDC.MARKET_INDEX)
+    ),
+  ])
+
+  const vaultIdleValue = await getVaultIdlePosition(
+    vc,
+    vault,
+    solendStrategyPosition
+      .add(marginfiStrategyPosition)
+      .add(klendStrategyPosition)
+      .add(driftStrategyPosition)
+  );
+  
+  const position = {
+    "vaultIdleValue": vaultIdleValue,
+    "drift": driftStrategyPosition,
+    "klend": klendStrategyPosition,
+    "solend": solendStrategyPosition,
+    "marginfi": marginfiStrategyPosition,
+  }
+
+  return position;
+};

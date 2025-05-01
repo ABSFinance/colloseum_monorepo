@@ -1,4 +1,3 @@
-import { Socket } from 'zeromq';
 
 export interface ZmqConfig {
   address: string;

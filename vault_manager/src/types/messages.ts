@@ -12,6 +12,7 @@ export interface ReallocationPayload {
 
 export interface ReallocationAction {
   poolId: string;
+  poolType: string;
   amount: number;
   type: 'deposit' | 'withdraw';
 } 

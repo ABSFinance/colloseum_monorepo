@@ -60,3 +60,11 @@ __init__.py
 
 # Keep example env file
 !.env.example 
+
+# JavaScript/Node.js specific files
+node_modules/
+**/node_modules/
+
+# Next.js specific files
+.next/
+abs-frontend/.next/ 
