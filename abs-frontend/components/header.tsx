@@ -4,8 +4,19 @@ import { motion } from "framer-motion"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Menu } from "lucide-react"
+import { usePrivy } from "@privy-io/react-auth"
 
 export default function Header() {
+  const { connectWallet } = usePrivy();
+
+  const handleConnect = async () => {
+    try {
+      await connectWallet();
+    } catch (error) {
+      console.error('Wallet connection failed:', error);
+    }
+  };
+
   return (
     <header className="border-b border-gray-800 p-4 flex justify-end items-center gap-4">
       <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
@@ -31,7 +42,7 @@ export default function Header() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
-        <Button className="bg-white text-black hover:bg-gray-200">Connect Wallet</Button>
+        <Button onClick={handleConnect} className="bg-white text-black hover:bg-gray-200">Connect Wallet</Button>
       </motion.div>
     </header>
   )

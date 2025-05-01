@@ -7,11 +7,20 @@ import { usePathname } from "next/navigation"
 import { Menu, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { usePrivy } from "@privy-io/react-auth"
 
 export default function MobileSidebar() {
   const pathname = usePathname()
   const [isOpen, setIsOpen] = useState(false)
+  const { connectWallet } = usePrivy();
 
+  const handleConnect = async () => {
+    try {
+      await connectWallet();
+    } catch (error) {
+      console.error('Wallet connection failed:', error);
+    }
+  };
   const navItems = [
     { name: "All Vaults", path: "/", icon: "shield" },
     { name: "Dashboard", path: "/dashboard", icon: "home" },
@@ -70,7 +79,7 @@ export default function MobileSidebar() {
               </nav>
 
               <div className="p-4 border-t border-gray-800">
-                <Button className="w-full bg-white text-black hover:bg-gray-200">Connect Wallet</Button>
+                <Button onClick={handleConnect} className="w-full bg-white text-black hover:bg-gray-200">Connect Wallet</Button>
               </div>
             </div>
           </motion.div>

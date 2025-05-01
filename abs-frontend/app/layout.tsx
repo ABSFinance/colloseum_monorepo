@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import {  Poppins } from "next/font/google";
+import { Poppins } from "next/font/google";
 import "./globals.css";
 import { VoltrClientProvider } from "@/components/providers/VoltrClientProvider";
+import Providers from "@/components/providers/PrivyProvider";
 
 const geistSans = Poppins({
   weight: ["100", "200", "300", "400", "500", "600", "700", "800"]
@@ -22,9 +23,11 @@ export default function RootLayout({
       <body
         className={`${geistSans.className} antialiased`}
       >
-        <VoltrClientProvider>
-          {children}
-        </VoltrClientProvider>
+        <Providers>
+          <VoltrClientProvider>
+            {children}
+          </VoltrClientProvider>
+        </Providers>
       </body>
     </html>
   );

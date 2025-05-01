@@ -8,7 +8,6 @@ import MobileDashboard from "./components/mobile-page"
 export default function Page() {
   const [isMounted, setIsMounted] = useState(false)
   const isMobile = useMediaQuery("(max-width: 768px)")
-
   useEffect(() => {
     setIsMounted(true)
   }, [])
@@ -17,5 +16,7 @@ export default function Page() {
     return null
   }
 
-  return isMobile ? <MobileDashboard /> : <Dashboard />
+  return <>
+    {isMobile ? <MobileDashboard /> : <Dashboard />}
+  </>
 }
