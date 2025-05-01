@@ -21,11 +21,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
                 },
                 appearance: {
                     theme: 'dark',
-                    logo: 'https://avatars.githubusercontent.com/u/179224234?s=200&v=4', 
+                    landingHeader: 'ABS Finance',
+                    logo: '', // Add abs finance logo url here 
                     showWalletLoginFirst: true,
                     walletList:["phantom","solflare","detected_solana_wallets","backpack","wallet_connect"]
                 },
                 loginMethods: ['wallet'],
+                solanaClusters: [{name: 'mainnet-beta', rpcUrl: 'https://api.mainnet-beta.solana.com'}]
             }}
         >
             {children}
