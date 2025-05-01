@@ -5,6 +5,7 @@ import { VoltrClientProvider } from "@/components/providers/VoltrClientProvider"
 import Providers from "@/components/providers/PrivyProvider";
 
 const geistSans = Poppins({
+  subsets:["latin"],
   weight: ["100", "200", "300", "400", "500", "600", "700", "800"]
 });
 
