@@ -1,17 +1,35 @@
-"use client"
-
-import { motion } from "framer-motion"
-import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Menu } from "lucide-react"
-import { usePrivy } from "@privy-io/react-auth"
+'use client';
+import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Menu } from 'lucide-react';
+import { usePrivy } from '@privy-io/react-auth';
+import { useEffect, useState } from 'react';
 
 export default function Header() {
-  const { connectWallet } = usePrivy();
+  const { connectWallet, user, ready, login } = usePrivy();
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (ready && user?.wallet?.address) {
+      setWalletAddress(user.wallet.address);
+
+      console.log(user);
+    }
+  }, [ready, user]);
+
 
   const handleConnect = async () => {
     try {
       await connectWallet();
+
+      await login();
+
     } catch (error) {
       console.error('Wallet connection failed:', error);
     }
@@ -42,8 +60,19 @@ export default function Header() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3 }}
       >
-        <Button onClick={handleConnect} className="bg-white text-black hover:bg-gray-200">Connect Wallet</Button>
+        {walletAddress ? (
+          <span className="text-white font-mono text-sm">
+            {walletAddress.slice(0, 4)}...{walletAddress.slice(-4)}
+          </span>
+        ) : (
+          <Button
+            onClick={handleConnect}
+            className="bg-white text-black hover:bg-gray-200"
+          >
+            Connect Wallet
+          </Button>
+        )}
       </motion.div>
     </header>
-  )
+  );
 }
