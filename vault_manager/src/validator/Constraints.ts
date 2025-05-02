@@ -1,4 +1,4 @@
-import { ReallocationPlan, AssetAllocation, ValidationError } from '../types/vault';
+import { ReallocationPlan, AllocationDetail, ValidationError } from '../types/vault';
 
 /**
  * Protocol constraints for vault operations
@@ -38,7 +38,7 @@ export class Constraints {
    * @param allocation - Asset allocations to validate
    * @returns Array of validation errors, empty if valid
    */
-  validateAssetCount(assets: AssetAllocation[]): ValidationError[] {
+  validateAssetCount(assets: AllocationDetail[]): ValidationError[] {
     const errors: ValidationError[] = [];
     
     if (assets.length > this.maxAssets) {
@@ -60,16 +60,16 @@ export class Constraints {
    * @param assets - Asset allocations to validate
    * @returns Array of validation errors, empty if valid
    */
-  validateAllocationPercentages(assets: AssetAllocation[]): ValidationError[] {
+  validateAllocationPercentages(assets: AllocationDetail[]): ValidationError[] {
     const errors: ValidationError[] = [];
     
     for (const asset of assets) {
       if (asset.percentage < this.minAllocationPercentage) {
         errors.push({
           code: 'MIN_ALLOCATION_VIOLATED',
-          message: `Asset ${asset.assetId} allocation (${asset.percentage}%) is below minimum (${this.minAllocationPercentage}%)`,
+          message: `Asset ${asset.poolId} allocation (${asset.percentage}%) is below minimum (${this.minAllocationPercentage}%)`,
           details: {
-            assetId: asset.assetId,
+            assetId: asset.poolId,
             current: asset.percentage,
             minimum: this.minAllocationPercentage
           }
@@ -79,9 +79,9 @@ export class Constraints {
       if (asset.percentage > this.maxAllocationPercentage) {
         errors.push({
           code: 'MAX_ALLOCATION_VIOLATED',
-          message: `Asset ${asset.assetId} allocation (${asset.percentage}%) exceeds maximum (${this.maxAllocationPercentage}%)`,
+          message: `Asset ${asset.poolId} allocation (${asset.percentage}%) exceeds maximum (${this.maxAllocationPercentage}%)`,
           details: {
-            assetId: asset.assetId,
+            assetId: asset.poolId,
             current: asset.percentage,
             maximum: this.maxAllocationPercentage
           }
@@ -97,7 +97,7 @@ export class Constraints {
    * @param assets - Asset allocations to validate
    * @returns Array of validation errors, empty if valid
    */
-  validateTotalAllocation(assets: AssetAllocation[]): ValidationError[] {
+  validateTotalAllocation(assets: AllocationDetail[]): ValidationError[] {
     const errors: ValidationError[] = [];
     
     const totalPercentage = assets.reduce((sum, asset) => sum + asset.percentage, 0);
@@ -146,9 +146,9 @@ export class Constraints {
    * @returns Array of validation errors, empty if valid
    */
   validate(plan: ReallocationPlan): ValidationError[] {
-    const assetCountErrors = this.validateAssetCount(plan.expectedAllocation.assets);
-    const percentageErrors = this.validateAllocationPercentages(plan.expectedAllocation.assets);
-    const totalAllocationErrors = this.validateTotalAllocation(plan.expectedAllocation.assets);
+    const assetCountErrors = this.validateAssetCount(plan.expectedAllocation.details);
+    const percentageErrors = this.validateAllocationPercentages(plan.expectedAllocation.details);
+    const totalAllocationErrors = this.validateTotalAllocation(plan.expectedAllocation.details);
     const transactionValueErrors = this.validateTransactionValue(plan);
     
     return [

@@ -2,8 +2,8 @@ import { Connection, PublicKey, Transaction as SolanaTransaction, Commitment } f
 import { SolanaConfig, TokenAccount } from './types';
 
 export class SolanaClient {
-  private connection: Connection;
-  private wallet: any; // Replace with proper wallet type
+  public connection: Connection;
+  public wallet: any; // Replace with proper wallet type
 
   constructor(config: SolanaConfig, wallet: any) {
     this.connection = new Connection(config.rpcUrl, {

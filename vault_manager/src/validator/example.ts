@@ -9,20 +9,21 @@ import {
   VaultState, 
   ReallocationPlan,
   Allocation,
-  AssetAllocation,
+  AllocationDetail,
   VaultStatus
 } from '../types/vault';
+import { VoltrClient } from '@voltr/vault-sdk';
+import { createClient } from '@supabase/supabase-js';
 
 // Mock data for demonstration
 const mockVaultStates: Record<string, VaultState> = {
   'pool-1': {
     poolId: 'pool-1',
     currentAllocation: {
-      assets: [
-        { assetId: 'BTC', amount: 1.5, value: 60000, percentage: 60 },
-        { assetId: 'ETH', amount: 20, value: 40000, percentage: 40 }
+      details: [
+        { poolId: '10002', amount: 1.5, allocated_pool_id: '1105' },
+        { poolId: '10002', amount: 20, allocated_pool_id: '1088' }
       ],
-      totalValue: 100000
     },
     lastUpdated: new Date(),
     status: VaultStatus.ACTIVE
@@ -46,27 +47,42 @@ async function validateExample() {
       commitment: 'confirmed' as const 
     };
     const solanaClient = new SolanaClient(solanaConfig, { payer: null });
+
+    const vc = new VoltrClient(
+      solanaClient.connection,
+      solanaClient.wallet
+    );
+
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_ANON_KEY;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase credentials');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
     
     // Create validator
     const validator = new Validator(
       constraints,
       solanaClient,
+      supabase,
+      vc,
       getVaultState
     );
     
     // Sample reallocation plan
     const plan: ReallocationPlan = {
-      poolId: 'pool-1',
+      poolId: '10002',
       actions: [
-        { poolId: 'BTC', amount: 5000, type: 'withdraw' },
-        { poolId: 'ETH', amount: 5000, type: 'deposit' }
+        { poolId: '1105', amount: 5000, type: 'withdraw' },
+        { poolId: '1088', amount: 5000, type: 'deposit' }
       ],
       expectedAllocation: {
-        assets: [
-          { assetId: 'BTC', amount: 1.4, value: 55000, percentage: 55 },
-          { assetId: 'ETH', amount: 22.5, value: 45000, percentage: 45 }
+        details: [
+          { poolId: '10002', amount: 1.4, allocated_pool_id: '1105' },
+          { poolId: '10002', amount: 22.5, allocated_pool_id: '1088' }
         ],
-        totalValue: 100000
       },
       timestamp: new Date().toISOString()
     };

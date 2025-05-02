@@ -10,6 +10,7 @@ import {
 } from '../types/vault';
 import { SolanaClient } from '../clients/solana/SolanaClient';
 import { VoltrClient } from '@voltr/vault-sdk';
+import { SupabaseClient } from '@supabase/supabase-js';
 
 const { getPosition } = require('../clients/voltr/position');
 
@@ -21,6 +22,8 @@ const { getPosition } = require('../clients/voltr/position');
 export class Validator {
   private constraints: Constraints;
   private solanaClient: SolanaClient;
+  private supabase: SupabaseClient;
+  private voltrClient: VoltrClient;
   private vaultStateProvider: (poolId: string) => Promise<VaultState | null>;
   
   /**
@@ -32,10 +35,14 @@ export class Validator {
   constructor(
     constraints: Constraints,
     solanaClient: SolanaClient,
+    supabase: SupabaseClient,
+    voltrClient: VoltrClient,
     vaultStateProvider: (poolId: string) => Promise<VaultState | null>
   ) {
     this.constraints = constraints;
     this.solanaClient = solanaClient;
+    this.supabase = supabase;
+    this.voltrClient = voltrClient;
     this.vaultStateProvider = vaultStateProvider;
   }
 
@@ -107,21 +114,39 @@ export class Validator {
    * @param plan - Reallocation plan to validate
    * @returns Promise resolving to boolean indicating if there is sufficient liquidity
    */
-  async verifyLiquidity(vc: VoltrClient, vault: PublicKey, plan: ReallocationPlan): Promise<boolean> {
+  async verifyLiquidity(plan: ReallocationPlan): Promise<boolean> {
     try {
       // Import the getPosition function directly to avoid module import issues
+
+      const vault = await this.supabase.from('abs_vault_info').select('*').eq('pool_id', plan.poolId).single();
+
+      if (!vault) {
+        return false;
+      }
+
+      const vault_address = vault.data.address;
+      const vault_asset_mint = vault.data.underlying_token;
+      const strategy = vault.data.strategy;
       
-      const total_position = await getPosition(vc, vault, vault_asset_mint, strategy);
+      const total_position = await getPosition(this.voltrClient, vault_address, vault_asset_mint, strategy);
       
       for (const action of plan.actions) {
+
+        const pool_type_response = await this.supabase.from('pool_info').select('type').eq('pool_id', action.poolId).single();
+        const pool_type = pool_type_response.data?.type;
+
+        if (!pool_type) {
+          return false;
+        }
+
         try {
-          if (action.poolType === "drift_vault") {
+          if (pool_type === "drift_vault") {
             total_position.drift = total_position.drift.subn(action.amount);
-          } else if (action.poolType === "klend_vault") {
+          } else if (pool_type === "klend_vault") {
             total_position.klend = total_position.klend.subn(action.amount);
-          } else if (action.poolType === "solend_vault") {
+          } else if (pool_type === "solend_vault") {
             total_position.solend = total_position.solend.subn(action.amount);
-          } else if (action.poolType === "marginfi_vault") {
+          } else if (pool_type === "marginfi_vault") {
             total_position.marginfi = total_position.marginfi.subn(action.amount);
           }
           

@@ -11,19 +11,18 @@ export enum VaultStatus {
   ACTIVE = 'active',
   PENDING = 'pending',
   PAUSED = 'paused',
-  CLOSED = 'closed'
+  CLOSED = 'closed',
+  CONFIRMED = 'confirmed'
 }
 
 export interface Allocation {
-  assets: AssetAllocation[];
-  totalValue: number;
+  details: AllocationDetail[];
 }
 
-export interface AssetAllocation {
-  assetId: string;
+export interface AllocationDetail {
+  poolId: string;
+  allocated_pool_id: string;
   amount: number;
-  value: number;
-  percentage: number;
 }
 
 export interface ReallocationPlan {
