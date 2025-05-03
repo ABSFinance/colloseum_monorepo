@@ -22,7 +22,7 @@ export default function MobileSidebar() {
     }
   };
   const navItems = [
-    { name: "All Vaults", path: "/", icon: "shield" },
+    { name: "All Vaults", path: "/dashboard/vaults", icon: "shield" },
     { name: "Dashboard", path: "/dashboard", icon: "home" },
     { name: "Reward Center", path: "/rewards", icon: "gift" },
   ]
