@@ -85,19 +85,19 @@ export default function Hero() {
                     </motion.h1>
 
                     <motion.p variants={itemVariants} className="text-lg md:text-xl text-gray-400 max-w-3xl mx-auto mb-8">
-                        ABS Finance uses advanced algorithms to find and allocate your assets to the highest-yielding opportunities
-                        across multiple chains and protocols.
+                        ABS Finance uses AI models to find and allocate your assets to the highest-yielding opportunities
+                        across solana and all the vaults.
                     </motion.p>
 
                     <motion.div variants={itemVariants} className="flex flex-col sm:flex-row justify-center gap-4 mb-16">
-                        <Button size="lg" className="bg-white text-black hover:bg-gray-200 transition-colors text-base">
-                            Launch App
+                        <Button size="lg" className="bg-white text-black hover:bg-gray-200 cursor-pointer transition-colors text-base">
+                            Get Started
                             <ArrowRight className="ml-2 h-4 w-4" />
                         </Button>
                         <Button
                             size="lg"
-                            variant="outline"
-                            className="border-gray-700 text-white hover:bg-white/10 transition-colors text-base"
+                            variant="ghost"
+                            className="border-gray-700 bg-gray-700 text-white hover:bg-gray-600 hover:text-white cursor-pointer transition-colors text-base"
                         >
                             Learn How It Works
                         </Button>
