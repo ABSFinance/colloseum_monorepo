@@ -50,7 +50,7 @@ export default function Hero() {
             transition: {
                 duration: 5,
                 repeat: Number.POSITIVE_INFINITY,
-                repeatType: "reverse",
+                repeatType: "reverse" as const,
             },
         },
     }
