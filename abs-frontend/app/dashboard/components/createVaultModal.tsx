@@ -216,7 +216,7 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                     </div>
 
                     {/* Right Column */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 mt-2">
                       <h3 className="text-lg font-medium">Initial Deposit</h3>
                       <div className="relative">
                         <Input
@@ -267,9 +267,13 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                   </div>
 
                   {!isFullyAllocated && (
-                    <Alert variant="destructive" className="bg-yellow-900/20 border-yellow-600 text-yellow-100">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription>You must allocate exactly 100% before proceeding</AlertDescription>
+                    <Alert variant="destructive" className="bg-yellow-100/90 text-yellow-800">
+                      <AlertCircle className="h-4 w-4 font-bold" />
+                      <AlertDescription>
+                        <span className="text-yellow-800">
+                          You must allocate exactly 100% before proceeding
+                        </span>
+                      </AlertDescription>
                     </Alert>
                   )}
 
@@ -287,7 +291,7 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Badge variant="outline" className="bg-blue-500/10 border-blue-500/30">
+                            <Badge variant="outline" className="bg-blue-300/90">
                               {allocation.percentage}%
                             </Badge>
                             <Button
@@ -313,14 +317,14 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                       </div>
                     ))}
                   </div>
-
+{/* 
                   <div>
                     <div className="flex justify-between text-sm mb-2">
                       <span>Token Allocation</span>
                       <span className={isFullyAllocated ? "text-green-500" : "text-yellow-500"}>{totalAllocated}%</span>
                     </div>
                     <Progress value={totalAllocated} className="h-3 bg-[#2c2c2e]" />
-                  </div>
+                  </div> */}
                 </div>
               )}
 
@@ -332,10 +336,10 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                   </div>
 
                   <Card className="bg-[#2c2c2e] border-0 overflow-hidden">
-                    <CardContent className="p-6">
+                    <CardContent>
                       <div className="flex justify-between items-start mb-4">
                         <div>
-                          <h3 className="text-xl font-semibold">{vaultName || "Untitled Vault"}</h3>
+                          <h3 className="text-xl font-semibold text-white">{vaultName || "Untitled Vault"}</h3>
                           <p className="text-sm text-gray-400 mt-1">{vaultDescription || "No description"}</p>
                         </div>
                         <Badge className="bg-green-600">Ready</Badge>
@@ -353,12 +357,12 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                                 <div className="mr-2 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs">
                                   Ⓤ
                                 </div>
-                                <span className="font-medium">USDC</span>
+                                <span className="font-medium text-white">USDC</span>
                               </div>
                             </div>
                             <div className="bg-[#3c3c3e] rounded-lg p-3">
                               <p className="text-xs text-gray-400">Initial Deposit</p>
-                              <p className="font-medium mt-1">{initialDeposit || "0"} USDC</p>
+                              <p className="font-medium mt-1 text-white">{initialDeposit || "0"} USDC</p>
                             </div>
                           </div>
                         </div>
@@ -376,11 +380,11 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                                     <span className="text-xs">{allocation.tokenIcon}</span>
                                   </div>
                                   <div>
-                                    <div className="font-medium">{allocation.name}</div>
+                                    <div className="font-medium text-white">{allocation.name}</div>
                                     <div className="text-xs text-gray-400">{allocation.strategy}</div>
                                   </div>
                                 </div>
-                                <Badge variant="outline" className="bg-blue-500/10 border-blue-500/30">
+                                <Badge variant="outline" className="bg-blue-100/90 border-blue-500/30">
                                   {allocation.percentage}%
                                 </Badge>
                               </div>
@@ -417,7 +421,7 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                 <Button
                   variant="outline"
                   onClick={handleBack}
-                  className="border-gray-700 text-white hover:bg-[#2c2c2e] hover:text-white"
+                  className="border-gray-700 bg-zinc-800 text-white hover:bg-[#2c2c2e] hover:text-white"
                 >
                   <ChevronLeft className="mr-2 h-4 w-4" /> Back
                 </Button>
@@ -434,7 +438,7 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                   Next <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
               ) : (
-                <Button onClick={handleCreateVault} className="bg-green-600 hover:bg-green-700">
+                <Button onClick={handleCreateVault} className="bg-green-600 hover:bg-green-700 cursor-pointer">
                   Create Vault
                 </Button>
               )}
