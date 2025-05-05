@@ -148,7 +148,7 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
     if (wallets.length > 0 && wallets[0].address) {
       const ix = await client?.createInitializeVaultIx(vaultParams, {
         vault: vaultKeypair.publicKey,
-        vaultAssetMint: new PublicKey("7XSjv7HYkU7A6jkFh9BgnxyiLPxV1GgF16tnn5NfA5hW"), // USDC on mainnet
+        vaultAssetMint: new PublicKey("EPjFWdd5AufqSSqeM2q7t6RXY2bQkzrzRkzZk1hKJ4G"), // USDC on mainnet
         admin: new PublicKey(wallets[0].address),
         manager: new PublicKey(wallets[0].address),
         payer: new PublicKey(wallets[0].address),
