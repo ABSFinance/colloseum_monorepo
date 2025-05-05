@@ -11,7 +11,6 @@ import { Slider } from "@/components/ui/slider"
 import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 
 interface CreateVaultModalProps {
@@ -317,7 +316,7 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                       </div>
                     ))}
                   </div>
-{/* 
+                  {/* 
                   <div>
                     <div className="flex justify-between text-sm mb-2">
                       <span>Token Allocation</span>
@@ -398,7 +397,7 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                             {allocations.map((allocation, index) => (
                               <div
                                 key={index}
-                                className="h-full flex items-center justify-center text-xs font-medium"
+                                className="h-full flex items-center justify-center text-xs font-medium text-white"
                                 style={{
                                   width: `${allocation.percentage}%`,
                                   backgroundColor: index === 0 ? "#3b82f6" : index === 1 ? "#6366f1" : "#8b5cf6",

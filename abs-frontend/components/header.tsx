@@ -8,32 +8,41 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Menu } from 'lucide-react';
-import { usePrivy } from '@privy-io/react-auth';
+import { useConnectWallet, useSolanaWallets } from '@privy-io/react-auth';
 import { useEffect, useState } from 'react';
 
 export default function Header() {
-  const { connectWallet, user, ready, login } = usePrivy();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (ready && user?.wallet?.address) {
-      setWalletAddress(user.wallet.address);
-
-      console.log(user);
-    }
-  }, [ready, user]);
-
+  const { connectWallet } = useConnectWallet();
+  const { wallets } = useSolanaWallets();
+  const [shouldLogin, setShouldLogin] = useState(false);
 
   const handleConnect = async () => {
     try {
       await connectWallet();
-
-      await login();
-
+      setShouldLogin(true); // Trigger login after wallet is connected
     } catch (error) {
       console.error('Wallet connection failed:', error);
     }
   };
+
+  useEffect(() => {
+    const login = async () => {
+      if (wallets.length > 0 && shouldLogin) {
+        try {
+          console.log('Logging in with wallet:', wallets[0]);
+          await wallets[0].loginOrLink();
+          setWalletAddress(wallets[0].address);
+          setShouldLogin(false);
+        } catch (error) {
+          console.error('Login failed:', error);
+        }
+      }
+    };
+
+    login();
+
+  }, [wallets, shouldLogin]);
 
   return (
     <header className="border-b border-gray-800 p-4 flex justify-end items-center gap-4">
