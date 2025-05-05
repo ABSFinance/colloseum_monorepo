@@ -12,6 +12,10 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
+import { BN } from "@coral-xyz/anchor";
+import { Keypair, PublicKey } from "@solana/web3.js";
+import { useVoltrClientStore } from "@/components/hooks/useVoltrClientStore"
+import { useSolanaWallets } from "@privy-io/react-auth"
 
 interface CreateVaultModalProps {
   isOpen: boolean
@@ -65,7 +69,11 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
       token: "ETH",
       tokenIcon: "E",
     },
-  ])
+  ]);
+  const { wallets } = useSolanaWallets();
+
+  const client = useVoltrClientStore((state) => state.client);
+
 
   const totalAllocated = allocations.reduce((sum, item) => sum + item.percentage, 0)
   const isFullyAllocated = totalAllocated === 100
@@ -114,16 +122,43 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
     else if (activeTab === "preview") setActiveTab("allocation")
   }
 
-  const handleCreateVault = () => {
-    // Logic to create the vault would go here
-    console.log("Creating vault with:", {
+  const handleCreateVault = async () => {
+    const vaultParams = {
+      config: {
+        maxCap: new BN("1000000000"), // Masximum total assets
+        startAtTs: new BN(Math.floor(Date.now() / 1000)), // time when vault becomes active
+        lockedProfitDegradationDuration: new BN(3600), // 1 hour
+        managerManagementFee: 50, // 0.5%
+        managerPerformanceFee: 1000, // 10%
+        adminManagementFee: 50, // 0.5%
+        adminPerformanceFee: 1000, // 10%
+        redemptionFee: 10, // 0.1%
+        issuanceFee: 10, // 0.1%
+        withdrawalWaitingPeriod: new BN(3600), // 1 hour
+      },
       name: vaultName,
       description: vaultDescription,
-      initialDeposit,
-      allocations,
-    })
-    onClose()
-  }
+    };
+
+    console.log("Vault Params", vaultParams);
+
+    const vaultKeypair = Keypair.generate();
+
+    // Create initialization instruction
+    if (wallets.length > 0 && wallets[0].address) {
+      const ix = await client?.createInitializeVaultIx(vaultParams, {
+        vault: vaultKeypair.publicKey,
+        vaultAssetMint: new PublicKey("7XSjv7HYkU7A6jkFh9BgnxyiLPxV1GgF16tnn5NfA5hW"), // USDC on mainnet
+        admin: new PublicKey(wallets[0].address),
+        manager: new PublicKey(wallets[0].address),
+        payer: new PublicKey(wallets[0].address),
+      });
+    } else {
+      console.log("Wallet not connected yet");
+    }
+    onClose();
+
+  };
 
   const handleRemoveAllocation = (id: string) => {
     setAllocations((prev) => prev.filter((item) => item.id !== id))
