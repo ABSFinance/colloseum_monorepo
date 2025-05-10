@@ -97,10 +97,11 @@ export default function Navbar() {
                         <MobileNavLink href="#about" onClick={() => setMobileMenuOpen(false)}>
                             Team
                         </MobileNavLink>
-                        <Button className="bg-white text-black hover:bg-gray-200 transition-colors w-full">
-                            <Wallet className="mr-2 h-4 w-4" />
-                            Get Started
-                        </Button>
+                        <Link href={"/dashboard/vaults"}>
+                            <Button className="bg-white text-black hover:bg-gray-200 transition-colors w-full">
+                                Get Started
+                            </Button>
+                        </Link>
                     </div>
                 </motion.div>
             )}
