@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ArrowLeft, Info, Wallet, TrendingUp, BarChart3, DollarSign, Clock, Zap, ChevronRight } from "lucide-react"
+import { ArrowLeft, Info, TrendingUp, BarChart3, DollarSign, Clock, Zap, ChevronRight } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,6 +12,7 @@ import { PieChart, Pie, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, Area, 
 import { cn } from "@/lib/utils"
 import Sidebar from "@/components/Sidebar"
 import Header from "@/components/header"
+import Link from "next/link"
 
 export default function CryptoDashboard() {
     const [depositAmount, setDepositAmount] = useState("")
@@ -66,9 +67,11 @@ export default function CryptoDashboard() {
                 <Header />
                 <header className="flex items-center justify-between mt-7">
                     <div className="flex items-center gap-3">
-                        <Button variant="ghost" size="icon" className="rounded-full bg-zinc-800 hover:bg-zinc-700">
-                            <ArrowLeft className="h-5 w-5" />
-                        </Button>
+                        <Link href={"/dashboard/vaults"}>
+                            <Button variant="ghost" size="icon" className="rounded-full bg-zinc-800 hover:bg-zinc-900 hover:text-white cursor-pointer">
+                                <ArrowLeft className="h-5 w-5" />
+                            </Button>
+                        </Link>
                         <div className="flex items-center gap-3">
                             <div className="bg-gradient-to-r from-blue-500 to-violet-500 rounded-full h-10 w-10 flex items-center justify-center shadow-lg shadow-blue-500/20">
                                 <span className="text-sm font-bold">SOL</span>
