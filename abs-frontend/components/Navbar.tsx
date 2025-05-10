@@ -5,7 +5,7 @@ import type React from "react"
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
-import { Menu, X, Wallet } from "lucide-react"
+import { Menu, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import logo from "@/public/logo.png"
@@ -62,10 +62,11 @@ export default function Navbar() {
                 </motion.nav>
 
                 <motion.div variants={itemVariants} className="hidden md:block">
-                    <Button className="bg-white text-black hover:bg-gray-200 transition-colors">
-                        <Wallet className="mr-2 h-4 w-4" />
-                        Get Started
-                    </Button>
+                    <Link href={"/dashboard/vaults"}>
+                        <Button className="bg-white cursor-pointer text-black hover:bg-gray-200 transition-colors">
+                            Get Started
+                        </Button>
+                    </Link>
                 </motion.div>
 
                 {/* Mobile Menu Button */}
@@ -98,7 +99,7 @@ export default function Navbar() {
                             Team
                         </MobileNavLink>
                         <Link href={"/dashboard/vaults"}>
-                            <Button className="bg-white text-black hover:bg-gray-200 transition-colors w-full">
+                            <Button className="bg-white cursor-pointer text-black hover:bg-gray-200 transition-colors w-full">
                                 Get Started
                             </Button>
                         </Link>

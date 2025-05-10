@@ -15,6 +15,7 @@ export default function Header() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const { connectWallet } = useConnectWallet();
   const { wallets } = useSolanaWallets();
+  const wallet = wallets[0];
   const [shouldLogin, setShouldLogin] = useState(false);
 
   const handleConnect = async () => {
@@ -46,22 +47,6 @@ export default function Header() {
 
   return (
     <header className="border-b border-gray-800 p-4 flex justify-end items-center gap-4">
-      <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="rounded-full">
-              <Menu className="h-5 w-5" />
-              <span className="sr-only">Menu</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>Settings</DropdownMenuItem>
-            <DropdownMenuItem>Help</DropdownMenuItem>
-            <DropdownMenuItem>About</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </motion.div>
-
       <motion.div
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
@@ -70,13 +55,29 @@ export default function Header() {
         transition={{ delay: 0.3 }}
       >
         {walletAddress ? (
-          <span className="text-white font-mono text-sm">
-            {walletAddress.slice(0, 4)}...{walletAddress.slice(-4)}
-          </span>
+          <div className="flex items-center gap-7">
+            <span className="text-white font-mono text-sm">
+              {walletAddress.slice(0, 4)}...{walletAddress.slice(-4)}
+            </span>
+            <Button
+              onClick={async () => {
+                try {
+                  await wallet.disconnect();
+                  setWalletAddress(null);
+                } catch (err) {
+                  console.error('Failed to disconnect:', err);
+                }
+              }}
+              variant="secondary"
+              className="text-white border-white bg-red-600"
+            >
+              Disconnect
+            </Button>
+          </div>
         ) : (
           <Button
             onClick={handleConnect}
-            className="bg-white text-black hover:bg-gray-200"
+            className="bg-white text-black hover:bg-gray-200 cursor-pointer"
           >
             Connect Wallet
           </Button>

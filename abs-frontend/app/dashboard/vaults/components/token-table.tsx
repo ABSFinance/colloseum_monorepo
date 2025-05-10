@@ -2,12 +2,15 @@
 import { motion, AnimatePresence } from "framer-motion"
 import type { TokenData } from "@/lib/types"
 import TokenRow from "./token-row"
+import { useVaultStore } from "@/stores/vaults-store"
 
 interface TokenTableProps {
   tokens: TokenData[]
 }
 
 export default function TokenTable({ tokens }: TokenTableProps) {
+  const vaults = useVaultStore((state) => state.vaults);
+
   return (
     <motion.div
       className="overflow-x-auto"
@@ -29,7 +32,7 @@ export default function TokenTable({ tokens }: TokenTableProps) {
         </thead>
         <tbody>
           <AnimatePresence>
-            {tokens.map((token, index) => (
+            {vaults.map((token, index) => (
               <TokenRow key={token.id} token={token} index={index} />
             ))}
           </AnimatePresence>
