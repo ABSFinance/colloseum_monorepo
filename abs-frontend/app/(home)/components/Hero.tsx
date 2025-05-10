@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import { ArrowRight, TrendingUp, Shield, BarChart3 } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 
 export default function Hero() {
     const [isVisible, setIsVisible] = useState(false)
@@ -90,10 +91,12 @@ export default function Hero() {
                     </motion.p>
 
                     <motion.div variants={itemVariants} className="flex flex-col sm:flex-row justify-center gap-4 mb-16">
-                        <Button size="lg" className="bg-white text-black hover:bg-gray-200 cursor-pointer transition-colors text-base">
-                            Get Started
-                            <ArrowRight className="ml-2 h-4 w-4" />
-                        </Button>
+                        <Link href={'/dashboard/vaults'}>
+                            <Button size="lg" className="bg-white text-black hover:bg-gray-200 cursor-pointer transition-colors text-base">
+                                Get Started
+                                <ArrowRight className="ml-2 h-4 w-4" />
+                            </Button>
+                        </Link>
                         <Button
                             size="lg"
                             variant="ghost"

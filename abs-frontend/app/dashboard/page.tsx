@@ -1,21 +1,10 @@
-
 "use client"
-import { useEffect, useState } from "react";
-import FinancialDashboard from "./components/FinancialDashboard";
-import { useMediaQuery } from "@/hooks/use-mobile";
-import MobileDashboard from "./components/Mobiledash";
-
+import FinancialDashboard from "./components/FinancialDashboard"
+import MobileDashboard from "./components/Mobiledash"
+import { useMediaQuery } from "@/hooks/use-mobile"
 
 export default function Page() {
-  const [isMounted, setIsMounted] = useState(false)
-  const isMobile = useMediaQuery("(max-width: 768px)")
-  useEffect(() => {
-    setIsMounted(true)
-  }, [])
-
-  if (!isMounted) {
-    return null
-  }
+  const isMobile = useMediaQuery('(max-width: 768px)')
 
   return isMobile ? <MobileDashboard /> : <FinancialDashboard />
 }

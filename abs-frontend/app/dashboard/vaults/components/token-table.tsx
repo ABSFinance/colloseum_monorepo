@@ -2,12 +2,29 @@
 import { motion, AnimatePresence } from "framer-motion"
 import type { TokenData } from "@/lib/types"
 import TokenRow from "./token-row"
+import { useVaultStore } from "@/stores/vaults-store"
+import { useEffect } from "react"
 
 interface TokenTableProps {
   tokens: TokenData[]
 }
 
 export default function TokenTable({ tokens }: TokenTableProps) {
+  const { vaults, loading, error, fetchVaults } = useVaultStore();
+
+  useEffect(() => {
+    fetchVaults()
+  }, [fetchVaults])
+
+  if (loading) {
+    return <p>Loading...</p>
+  }
+
+  if (error) {
+    return <p className="text-red-500">Error: {error}</p>
+  }
+  console.log("my vaults", vaults);
+
   return (
     <motion.div
       className="overflow-x-auto"
@@ -29,7 +46,7 @@ export default function TokenTable({ tokens }: TokenTableProps) {
         </thead>
         <tbody>
           <AnimatePresence>
-            {tokens.map((token, index) => (
+            {vaults.map((token, index) => (
               <TokenRow key={token.id} token={token} index={index} />
             ))}
           </AnimatePresence>
