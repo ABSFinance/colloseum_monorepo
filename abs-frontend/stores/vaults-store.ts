@@ -1,12 +1,25 @@
-import { create } from 'zustand';
-import { VaultInfo } from '@/lib/types';
+import { create } from 'zustand'
+import { supabase } from '@/lib/supabase'
+import { VaultInfo } from '@/lib/types'
 
-interface VaultState {
-  vaults: VaultInfo[];
-  setVaults: (vaults: VaultInfo[]) => void;
+type VaultStore = {
+  vaults: VaultInfo[]
+  loading: boolean
+  error: string | null
+  fetchVaults: () => Promise<void>
 }
 
-export const useVaultStore = create<VaultState>((set) => ({
+export const useVaultStore = create<VaultStore>((set) => ({
   vaults: [],
-  setVaults: (vaults) => set({ vaults }),
-}));
+  loading: false,
+  error: null,
+  fetchVaults: async () => {
+    set({ loading: true, error: null })
+    const { data, error } = await supabase.from('drift_vault_info').select('*')
+    if (error) {
+      set({ error: error.message, loading: false })
+    } else {
+      set({ vaults: data || [], loading: false })
+    }
+  },
+}))

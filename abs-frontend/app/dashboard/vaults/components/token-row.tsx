@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { motion } from "framer-motion"
 import { ChevronDown } from "lucide-react"
-import type { TokenData, VaultInfo } from "@/lib/types"
+import type { VaultInfo } from "@/lib/types"
 import TokenIcon from "./token-icon"
 
 interface TokenRowProps {
@@ -26,13 +26,13 @@ export default function TokenRow({ token, index }: TokenRowProps) {
       <td className="py-4 px-4">
         <div className="flex items-center gap-3">
           <TokenIcon symbol={token.id} />
-          <span className="font-medium">{token.name}</span>
+          <span className="font-medium">{token.name.slice(0, 5)}</span>
         </div>
       </td>
-      <td className="text-right py-4 px-4">${token.description}</td>
-      <td className="text-right py-4 px-4">${token.market_tokens}</td>
+      <td className="text-right py-4 px-4">${token.description.slice(0, 5)}</td>
+      <td className="text-right py-4 px-4">${token.market_tokens?.slice(0, 5)}</td>
       <td className="text-right py-4 px-4">${token.underlying_token}</td>
-      <td className="text-right py-4 px-4">{token.strategy}</td>
+      <td className="text-right py-4 px-4">{token.strategy.slice(0, 5)}</td>
       <td className="text-right py-4 px-4 font-medium">{token.created_at}</td>
       <td className="py-4 px-4">
         <motion.div animate={{ rotate: isExpanded ? 180 : 0 }} transition={{ duration: 0.3 }}>
