@@ -1,13 +1,6 @@
 'use client';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Menu } from 'lucide-react';
 import { useConnectWallet, useSolanaWallets } from '@privy-io/react-auth';
 import { useEffect, useState } from 'react';
 
