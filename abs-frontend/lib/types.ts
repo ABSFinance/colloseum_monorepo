@@ -10,17 +10,18 @@ export interface TokenData {
 }
 
 export interface VaultInfo {
-  id: string;
+  id: number;
   name: string;
-  description: string;
   address: string;
-  capacity: number;
+  strategy: string;
+  description: string | null;
   org_id: number;
   pool_id: number;
-  strategy: string;
   underlying_token: string;
-  market_tokens: string | null;
-  created_at: string;
-  updated_at: string;
-  timestamp: string;
+  capacity: number;
+  adaptors: string[];
+  allowed_pools: number[];
+  weight: number[];
+  created_at: string; // ISO 8601 date-time string
+  updated_at: string; // ISO 8601 date-time string
 }
