@@ -8,12 +8,14 @@ interface VoltrClientState {
     client: VoltrClient | null;
     initialize: () => void;
 }
+const ALCHEMY_RPC_URL = `https://go.getblock.io/${process.env.NEXT_PUBLIC_BLOCK_API_KEY}`;
+export const connection = new Connection(ALCHEMY_RPC_URL);
+
 
 export const useVoltrClientStore = create<VoltrClientState>((set) => ({
     client: null,
     initialize: () => {
-        const ALCHEMY_RPC_URL = `https://go.getblock.io/${process.env.NEXT_PUBLIC_BLOCK_API_KEY}`;
-        const connection = new Connection(ALCHEMY_RPC_URL);
+   
         const client = new VoltrClient(connection);
         set({ client });
     },

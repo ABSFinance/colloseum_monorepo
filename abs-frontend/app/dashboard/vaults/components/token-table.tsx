@@ -35,12 +35,13 @@ export default function TokenTable({ tokens }: TokenTableProps) {
       <table className="w-full">
         <thead>
           <tr className="text-gray-400 text-sm border-b border-gray-800">
-            <th className="text-left py-4 px-4 font-medium">Token</th>
-            <th className="text-right py-4 px-4 font-medium">TVL</th>
-            <th className="text-right py-4 px-4 font-medium">24H Vol</th>
-            <th className="text-right py-4 px-4 font-medium">24H Fees</th>
-            <th className="text-right py-4 px-4 font-medium">24H Fee/TVL</th>
-            <th className="text-right py-4 px-4 font-medium">Your Balance</th>
+            {/* <th className="text-left py-4 px-4 font-medium">Token</th> */}
+            <th className="text-right py-4 px-4 font-medium">Name</th>
+            <th className="text-right py-4 px-4 font-medium">Stratergy</th>
+            <th className="text-right py-4 px-4 font-medium">Adapters</th>
+            <th className="text-right py-4 px-4 font-medium">Weight</th>
+            {/* <th className="text-right py-4 px-4 font-medium">allowed_pools</th> */}
+            <th className="text-right py-4 px-4 font-medium">createdAt</th>
             <th className="py-4 px-4 w-10"></th>
           </tr>
         </thead>

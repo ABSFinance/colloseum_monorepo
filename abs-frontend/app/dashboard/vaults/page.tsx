@@ -1,4 +1,5 @@
 'use client';
+
 import { useMediaQuery } from '@/hooks/use-mobile';
 import Dashboard from './components/desktop-page';
 import MobileDashboard from './components/mobile-page';
