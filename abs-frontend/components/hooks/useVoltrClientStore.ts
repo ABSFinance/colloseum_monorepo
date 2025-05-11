@@ -12,7 +12,8 @@ interface VoltrClientState {
 export const useVoltrClientStore = create<VoltrClientState>((set) => ({
     client: null,
     initialize: () => {
-        const connection = new Connection("https://api.mainnet-beta.solana.com");
+        const ALCHEMY_RPC_URL = `https://go.getblock.io/${process.env.NEXT_PUBLIC_BLOCK_API_KEY}`;
+        const connection = new Connection(ALCHEMY_RPC_URL);
         const client = new VoltrClient(connection);
         set({ client });
     },

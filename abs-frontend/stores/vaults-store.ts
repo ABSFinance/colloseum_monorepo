@@ -15,7 +15,7 @@ export const useVaultStore = create<VaultStore>((set) => ({
   error: null,
   fetchVaults: async () => {
     set({ loading: true, error: null })
-    const { data, error } = await supabase.from('drift_vault_info').select('*')
+    const { data, error } = await supabase.from('abs_vault_info').select('*')
     if (error) {
       set({ error: error.message, loading: false })
     } else {

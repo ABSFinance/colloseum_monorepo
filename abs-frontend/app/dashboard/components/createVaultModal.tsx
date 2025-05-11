@@ -13,9 +13,11 @@ import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { BN } from "@coral-xyz/anchor";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
 import { useVoltrClientStore } from "@/components/hooks/useVoltrClientStore"
 import { useSolanaWallets } from "@privy-io/react-auth"
+import { supabase } from "@/lib/supabase"
+import { useSendTransaction } from "@privy-io/react-auth/solana"
 
 interface CreateVaultModalProps {
   isOpen: boolean
@@ -121,12 +123,11 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
     if (activeTab === "allocation") setActiveTab("setup")
     else if (activeTab === "preview") setActiveTab("allocation")
   }
-
   const handleCreateVault = async () => {
     const vaultParams = {
       config: {
-        maxCap: new BN("1000000000"), // Masximum total assets
-        startAtTs: new BN(Math.floor(Date.now() / 1000)), // time when vault becomes active
+        maxCap: new BN("1000000000"), // Maximum total assets
+        startAtTs: new BN(Math.floor(Date.now() / 1000)), // Time when vault becomes active
         lockedProfitDegradationDuration: new BN(3600), // 1 hour
         managerManagementFee: 50, // 0.5%
         managerPerformanceFee: 1000, // 10%
@@ -140,25 +141,71 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
       description: vaultDescription,
     };
 
-    console.log("Vault Params", vaultParams);
+    console.log("Vault Params:", vaultParams);
 
     const vaultKeypair = Keypair.generate();
 
-    // Create initialization instruction
+    // Check if wallets are connected
     if (wallets.length > 0 && wallets[0].address) {
-      const ix = await client?.createInitializeVaultIx(vaultParams, {
-        vault: vaultKeypair.publicKey,
-        vaultAssetMint: new PublicKey("EPjFWdd5AufqSSqeM2q7t6RXY2bQkzrzRkzZk1hKJ4G"), // USDC on mainnet
-        admin: new PublicKey(wallets[0].address),
-        manager: new PublicKey(wallets[0].address),
-        payer: new PublicKey(wallets[0].address),
-      });
+      try {
+        // Create initialization instruction
+        const ix = await client?.createInitializeVaultIx(vaultParams, {
+          vault: vaultKeypair.publicKey,
+          vaultAssetMint: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"), // USDC on mainnet
+          admin: new PublicKey(wallets[0].address),
+          manager: new PublicKey(wallets[0].address),
+          payer: new PublicKey(wallets[0].address),
+        });
+
+        // Check if instruction is created
+        if (!ix) {
+          console.error("Failed to create vault initialization instruction");
+          return;
+        }
+
+        console.log("Vault Initialization Instruction:", ix);
+
+        // Construct the transaction
+        // const transaction = new Transaction().add(ix);
+
+        // Send the transaction
+        // const signature = await useSendTransaction();
+
+        // Wait for the transaction to be confirmed
+        // await connection.confirmTransaction(signature);
+
+        // console.log("Vault transaction successful with signature:", signature);
+
+        // Now store the vault in Supabase DB
+        const { data, error } = await supabase
+          .from('abs_vault_info')
+          .insert([
+            {
+              vault_name: vaultParams.name,
+              vault_description: vaultParams.description,
+              vault_address: vaultKeypair.publicKey.toBase58(),
+              creator_address: wallets[0].address,
+              max_cap: vaultParams.config.maxCap.toString(),
+              start_at_ts: vaultParams.config.startAtTs.toString(),
+            },
+          ]);
+
+        if (error) {
+          console.error("Error storing vault in Supabase:", error);
+        } else {
+          console.log("Vault stored in Supabase:", data);
+        }
+
+      } catch (error) {
+        console.error("Error creating vault:", error);
+      }
     } else {
       console.log("Wallet not connected yet");
     }
-    onClose();
 
+    onClose();
   };
+
 
   const handleRemoveAllocation = (id: string) => {
     setAllocations((prev) => prev.filter((item) => item.id !== id))
