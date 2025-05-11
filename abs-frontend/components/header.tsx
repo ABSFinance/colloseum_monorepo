@@ -81,7 +81,7 @@ export default function Header() {
                     }
                   }}
                   variant="secondary"
-                  className="text-white border-white bg-red-600"
+                  className="text-white border-white bg-red-600 hover:bg-red-500 cursor-pointer"
                 >
                   Disconnect
                 </Button>

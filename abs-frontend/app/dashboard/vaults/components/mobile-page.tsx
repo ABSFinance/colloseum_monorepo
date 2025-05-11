@@ -72,7 +72,7 @@ export default function MobileDashboard() {
                 }
               }}
               variant="secondary"
-              className="text-white border-white bg-red-600"
+              className="text-white border-white bg-red-600 hover:bg-500 cursor-pointer"
             >
               Disconnect
             </Button>

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { ArrowLeft, Info, TrendingUp, BarChart3, DollarSign, Clock, Zap, ChevronRight } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -13,11 +13,55 @@ import { cn } from "@/lib/utils"
 import Sidebar from "@/components/Sidebar"
 import Header from "@/components/header"
 import Link from "next/link"
+import { useParams } from "next/navigation"
+import { supabase } from "@/lib/supabase"
+import { VaultInfo } from "@/lib/types"
 
 export default function CryptoDashboard() {
     const [depositAmount, setDepositAmount] = useState("")
     const [activeTab, setActiveTab] = useState("deposit")
     const [timeframe, setTimeframe] = useState("7D")
+    const { vaultid } = useParams() as { vaultid: string };
+    const [vaultData, setVaultData] = useState<VaultInfo>();
+    const [userVaultData, setUserVaultData] = useState<any>(null)
+    const [loading, setLoading] = useState(true)
+
+    useEffect(() => {
+        const fetchData = async () => {
+            if (!vaultid) return
+
+            setLoading(true)
+
+            const { data: vault, error: vaultError } = await supabase
+                .from("abs_vault_info")
+                .select("*")
+                .eq("id", vaultid)
+                .single()
+
+            const { data: userVault, error: userVaultError } = await supabase
+                .from("abs_vault_allocation_history ")
+                .select("*")
+                .eq("pool_id", vaultid)
+                .single()
+
+            // if (vaultError || userVaultError) {
+            //     console.error("Supabase fetch error:", vaultError || userVaultError)
+            // } else {
+
+            console.log(vault, userVault);
+            setVaultData(vault)
+            setUserVaultData(userVault)
+            // }
+
+            setLoading(false)
+        }
+
+        fetchData()
+    }, [vaultid]);
+
+    console.log(vaultData, userVaultData);
+
+    console.log("pool id", vaultid);
 
     // Vault allocation data
     const allocationData = [
@@ -77,13 +121,7 @@ export default function CryptoDashboard() {
                                 <span className="text-sm font-bold">SOL</span>
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold">SOL/USDC</h1>
-                                <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="bg-green-500/10 text-green-400 border-green-500/20">
-                                        +2.4%
-                                    </Badge>
-                                    <span className="text-sm text-zinc-400">24h</span>
-                                </div>
+                                <h1 className="text-2xl font-bold">{vaultData?.name}</h1>
                             </div>
                         </div>
                     </div>
@@ -93,10 +131,10 @@ export default function CryptoDashboard() {
                     <div className="lg:col-span-2 space-y-6">
                         {/* Key metrics */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <MetricCard title="TVL" value="$31.2K" trend="+5.2%" />
-                            <MetricCard title="My Balance" value="$5.2K" trend="+1.8%" />
-                            <MetricCard title="24H Volume" value="$5.2K" trend="-2.3%" isNegative />
-                            <MetricCard title="Total Asset" value="$200" trend="+0.5%" />
+                            <MetricCard title="Stratergy" value={vaultData?.strategy ?? ''} />
+                            <MetricCard title="Adapters" value={vaultData?.adaptors?.join(', ') ?? ''} />
+                            <MetricCard title="Weight" value={vaultData?.weight?.join(', ') ?? ''} />
+                            <MetricCard title="Capacity (Lamports)" value={vaultData?.capacity?.toString() ?? ''}  />
                         </div>
 
                         {/* Performance Chart */}
@@ -410,35 +448,18 @@ export default function CryptoDashboard() {
 function MetricCard({
     title,
     value,
-    trend,
-    isNegative = false,
-}: { title: string; value: string; trend: string; isNegative?: boolean }) {
+}: { title: string; value: string }) {
     return (
         <Card className="bg-zinc-800/50 border-zinc-700/50 backdrop-blur-sm overflow-hidden">
             <CardContent className="p-4">
                 <div className="flex flex-col">
-                    <p className="text-xl text-zinc-400">{title}</p>
-                    <p className="text-2xl font-bold mt-1 text-white">{value}</p>
-                    <div className="flex items-center mt-2">
-                        <Badge
-                            variant="outline"
-                            className={cn(
-                                "text-xs",
-                                isNegative
-                                    ? "bg-red-500/10 text-red-400 border-red-500/20"
-                                    : "bg-green-500/10 text-green-400 border-green-500/20",
-                            )}
-                        >
-                            {trend}
-                        </Badge>
-                    </div>
+                    <p className="text-md text-zinc-400">{title}</p>
+                    <p className="text-lg font-bold mt-1 text-white">{value}</p>
                 </div>
                 <div
                     className={cn(
                         "absolute bottom-0 left-0 right-0 h-1",
-                        isNegative
-                            ? "bg-gradient-to-r from-red-500/0 via-red-500/30 to-red-500/0"
-                            : "bg-gradient-to-r from-green-500/0 via-green-500/30 to-green-500/0",
+                        "bg-gradient-to-r from-green-500/0 via-green-500/30 to-green-500/0",
                     )}
                 />
             </CardContent>
