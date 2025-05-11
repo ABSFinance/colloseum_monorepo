@@ -324,7 +324,7 @@ export default function CryptoDashboard() {
                                             </div>
                                         </div>
 
-                                        <Button className="w-full h-12 bg-gradient-to-r from-blue-600 to-violet-600 hover:from-blue-700 hover:to-violet-700 shadow-lg shadow-blue-700/20">
+                                        <Button className="w-full h-12 bg-white text-black hover:bg-slate-200 hover:text-black cursor-pointer shadow-lg shadow-blue-700/20">
                                             Connect Wallet to Withdraw
                                         </Button>
                                     </TabsContent>
@@ -393,7 +393,7 @@ export default function CryptoDashboard() {
                                 ))}
                             </CardContent>
                             <CardFooter className="pt-0">
-                                <Button variant="outline" className="w-full border-zinc-700 hover:bg-zinc-700">
+                                <Button variant="secondary" className="w-full border-zinc-700 hover:bg-slate-200 cursor-pointer">
                                     View All Transactions
                                     <ChevronRight className="h-4 w-4 ml-2" />
                                 </Button>

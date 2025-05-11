@@ -1,16 +1,22 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { motion } from "framer-motion"
 import Sidebar from "@/components/Sidebar"
 import Header from "@/components/header"
 import SearchBar from "./searchbar"
 import TokenTable from "./token-table"
 import { tokenData } from "@/lib/data"
+import { useVaultStore } from "@/stores/vaults-store"
 
 export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState("")
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const { vaults, fetchVaults } = useVaultStore();
+
+  useEffect(() => {
+    fetchVaults()
+  }, [fetchVaults]);
 
   const filteredTokens = tokenData.filter((token) => token.name.toLowerCase().includes(searchQuery.toLowerCase()))
 
@@ -63,7 +69,7 @@ export default function Dashboard() {
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ delay: 0.2, duration: 0.5 }}
                 >
-                  <h2 className="text-3xl font-bold">5,274</h2>
+                  <h2 className="text-3xl font-bold">{vaults.length}</h2>
                   <p className="text-gray-400 text-sm">Pools available</p>
                 </motion.div>
               </div>

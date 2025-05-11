@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { BN } from "@coral-xyz/anchor";
 import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
-import { useVoltrClientStore } from "@/components/hooks/useVoltrClientStore"
+import {  connection, useVoltrClientStore } from "@/components/hooks/useVoltrClientStore"
 import { useSolanaWallets } from "@privy-io/react-auth"
 import { supabase } from "@/lib/supabase"
 import { useSendTransaction } from "@privy-io/react-auth/solana"
@@ -46,6 +46,8 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
   const [vaultDescription, setVaultDescription] = useState<string>("")
   const [initialDeposit, setInitialDeposit] = useState<string>("")
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const { sendTransaction } = useSendTransaction();
+
   const [allocations, setAllocations] = useState<AllocationItem[]>([
     {
       id: "1",
@@ -169,8 +171,15 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
         // const transaction = new Transaction().add(ix);
 
         // Send the transaction
-        // const signature = await useSendTransaction();
 
+        const transaction = new Transaction();
+
+        const receipt = await sendTransaction({
+          transaction: transaction,
+          connection: connection
+      });
+      
+      console.log("Transaction sent with signature:", receipt.signature);
         // Wait for the transaction to be confirmed
         // await connection.confirmTransaction(signature);
 
