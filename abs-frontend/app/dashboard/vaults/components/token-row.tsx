@@ -15,14 +15,13 @@ interface TokenRowProps {
 export default function TokenRow({ token, index }: TokenRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const router = useRouter();
-  console.log(token);
   return (
     <motion.tr
       className="border-b border-gray-800 hover:bg-gray-800/50 cursor-pointer"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.05 * index, duration: 0.3 }}
-      onClick={() => { router.push(`/dashboard/vaults/${token.id}`) }}
+      onClick={() => { router.push(`/dashboard/vaults/${token.id}/${token.pool_id}`) }}
       layout
     >
       <td className="text-right py-4">{token.name}</td>

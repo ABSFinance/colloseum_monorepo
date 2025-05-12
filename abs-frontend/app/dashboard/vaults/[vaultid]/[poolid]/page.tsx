@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { PieChart, Pie, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, Area, AreaChart } from "recharts"
 import { cn } from "@/lib/utils"
@@ -21,7 +20,7 @@ export default function CryptoDashboard() {
     const [depositAmount, setDepositAmount] = useState("")
     const [activeTab, setActiveTab] = useState("deposit")
     const [timeframe, setTimeframe] = useState("7D")
-    const { vaultid } = useParams() as { vaultid: string };
+    const { vaultid, poolid } = useParams() as { vaultid: string, poolid: string };
     const [vaultData, setVaultData] = useState<VaultInfo>();
     const [userVaultData, setUserVaultData] = useState<any>(null)
     const [loading, setLoading] = useState(true)
@@ -41,17 +40,15 @@ export default function CryptoDashboard() {
             const { data: userVault, error: userVaultError } = await supabase
                 .from("abs_vault_allocation_history ")
                 .select("*")
-                .eq("pool_id", vaultid)
-                .single()
+                .eq("pool_id", poolid);
 
-            // if (vaultError || userVaultError) {
-            //     console.error("Supabase fetch error:", vaultError || userVaultError)
-            // } else {
-
-            console.log(vault, userVault);
-            setVaultData(vault)
-            setUserVaultData(userVault)
-            // }
+            if (vaultError || userVaultError) {
+                console.error("Supabase fetch error:", vaultError || userVaultError)
+            } else {
+                console.log(vault, userVault);
+                setVaultData(vault)
+                setUserVaultData(userVault)
+            }
 
             setLoading(false)
         }
@@ -61,7 +58,7 @@ export default function CryptoDashboard() {
 
     console.log(vaultData, userVaultData);
 
-    console.log("pool id", vaultid);
+    console.log("pool id ", poolid, "vault id", vaultid);
 
     // Vault allocation data
     const allocationData = [
@@ -134,7 +131,7 @@ export default function CryptoDashboard() {
                             <MetricCard title="Stratergy" value={vaultData?.strategy ?? ''} />
                             <MetricCard title="Adapters" value={vaultData?.adaptors?.join(', ') ?? ''} />
                             <MetricCard title="Weight" value={vaultData?.weight?.join(', ') ?? ''} />
-                            <MetricCard title="Capacity (Lamports)" value={vaultData?.capacity?.toString() ?? ''}  />
+                            <MetricCard title="Capacity (Lamports)" value={vaultData?.capacity?.toString() ?? ''} />
                         </div>
 
                         {/* Performance Chart */}
