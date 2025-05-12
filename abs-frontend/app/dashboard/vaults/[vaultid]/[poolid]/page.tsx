@@ -54,7 +54,7 @@ export default function CryptoDashboard() {
         }
 
         fetchData()
-    }, [vaultid]);
+    }, [vaultid,poolid]);
 
     console.log(vaultData, userVaultData);
 
