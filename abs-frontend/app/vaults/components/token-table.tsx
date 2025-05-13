@@ -1,27 +1,27 @@
-"use client"
-import { motion, AnimatePresence } from "framer-motion"
-import type { TokenData } from "@/lib/types"
-import TokenRow from "./token-row"
-import { useVaultStore } from "@/stores/vaults-store"
-import { useEffect } from "react"
+"use client";
+import { motion, AnimatePresence } from "framer-motion";
+import type { TokenData } from "@/lib/types";
+import TokenRow from "./token-row";
+import { useVaultStore } from "@/stores/vaults-store";
+import { useEffect } from "react";
 
 interface TokenTableProps {
-  tokens: TokenData[]
+  tokens: TokenData[];
 }
 
 export default function TokenTable({ tokens }: TokenTableProps) {
   const { vaults, loading, error, fetchVaults } = useVaultStore();
 
   useEffect(() => {
-    fetchVaults()
-  }, [fetchVaults])
+    fetchVaults();
+  }, [fetchVaults]);
 
   if (loading) {
-    return <p>Loading...</p>
+    return <p>Loading...</p>;
   }
 
   if (error) {
-    return <p className="text-red-500">Error: {error}</p>
+    return <p className="text-red-500">Error: {error}</p>;
   }
   console.log("my vaults", vaults);
 
@@ -55,10 +55,14 @@ export default function TokenTable({ tokens }: TokenTableProps) {
       </table>
 
       {tokens.length === 0 && (
-        <motion.div className="text-center py-10 text-gray-400" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+        <motion.div
+          className="text-center py-10 text-gray-400"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+        >
           No tokens found
         </motion.div>
       )}
     </motion.div>
-  )
+  );
 }

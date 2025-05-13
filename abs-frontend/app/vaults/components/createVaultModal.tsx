@@ -1,36 +1,54 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { z } from "zod"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Textarea } from "@/components/ui/textarea"
-import { X, ChevronRight, ChevronDown, ChevronLeft, Search, AlertCircle } from "lucide-react"
-import { Slider } from "@/components/ui/slider"
-import { Card, CardContent } from "@/components/ui/card"
-import { Separator } from "@/components/ui/separator"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Badge } from "@/components/ui/badge"
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { z } from "zod";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  X,
+  ChevronRight,
+  ChevronDown,
+  ChevronLeft,
+  Search,
+  AlertCircle,
+} from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import { BN } from "@coral-xyz/anchor";
-import {  ComputeBudgetProgram, Keypair, PublicKey, TransactionConfirmationStrategy, TransactionInstruction, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
-import {  connection, useVoltrClientStore } from "@/components/hooks/useVoltrClientStore"
-import { useSolanaWallets, usePrivy } from "@privy-io/react-auth"
-import { supabase } from "@/lib/supabase"
-import { useSendTransaction } from "@privy-io/react-auth/solana"
+import {
+  ComputeBudgetProgram,
+  Keypair,
+  PublicKey,
+  TransactionConfirmationStrategy,
+  TransactionInstruction,
+  TransactionMessage,
+  VersionedTransaction,
+} from "@solana/web3.js";
+import {
+  connection,
+  useVoltrClientStore,
+} from "@/components/hooks/useVoltrClientStore";
+import { useSolanaWallets, usePrivy } from "@privy-io/react-auth";
+import { supabase } from "@/lib/supabase";
+import { useSendTransaction } from "@privy-io/react-auth/solana";
 
 interface CreateVaultModalProps {
-  isOpen: boolean
-  onClose: () => void
+  isOpen: boolean;
+  onClose: () => void;
 }
 
 interface AllocationItem {
-  id: string
-  name: string
-  strategy: string
-  percentage: number
-  token?: string
-  tokenIcon?: string
+  id: string;
+  name: string;
+  strategy: string;
+  percentage: number;
+  token?: string;
+  tokenIcon?: string;
 }
 
 // Zod schemas for validation
@@ -38,14 +56,16 @@ const setupSchema = z.object({
   vaultName: z.string().min(1, "Vault name is required"),
   vaultDescription: z.string().min(1, "Description is required"),
   initialDeposit: z.string().min(1, "Initial deposit is required"),
-})
+});
 
 export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
-  const [activeTab, setActiveTab] = useState<"setup" | "allocation" | "preview">("setup")
-  const [vaultName, setVaultName] = useState<string>("")
-  const [vaultDescription, setVaultDescription] = useState<string>("")
-  const [initialDeposit, setInitialDeposit] = useState<string>("")
-  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [activeTab, setActiveTab] = useState<
+    "setup" | "allocation" | "preview"
+  >("setup");
+  const [vaultName, setVaultName] = useState<string>("");
+  const [vaultDescription, setVaultDescription] = useState<string>("");
+  const [initialDeposit, setInitialDeposit] = useState<string>("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const { sendTransaction } = useSendTransaction();
 
   const [allocations, setAllocations] = useState<AllocationItem[]>([
@@ -87,7 +107,7 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
         ready,
         authenticated,
         userAddress: user?.wallet?.address,
-        wallets: wallets.map(w => w.address)
+        wallets: wallets.map((w) => w.address),
       });
 
       if (!ready) {
@@ -116,8 +136,11 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
 
   const client = useVoltrClientStore((state) => state.client);
 
-  const totalAllocated = allocations.reduce((sum, item) => sum + item.percentage, 0)
-  const isFullyAllocated = totalAllocated === 100
+  const totalAllocated = allocations.reduce(
+    (sum, item) => sum + item.percentage,
+    0
+  );
+  const isFullyAllocated = totalAllocated === 100;
 
   const validateSetup = () => {
     try {
@@ -125,50 +148,54 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
         vaultName,
         vaultDescription,
         initialDeposit,
-      })
-      setErrors({})
-      return true
+      });
+      setErrors({});
+      return true;
     } catch (error) {
       if (error instanceof z.ZodError) {
-        const newErrors: Record<string, string> = {}
+        const newErrors: Record<string, string> = {};
         error.errors.forEach((err) => {
           if (err.path[0]) {
-            newErrors[err.path[0].toString()] = err.message
+            newErrors[err.path[0].toString()] = err.message;
           }
-        })
-        setErrors(newErrors)
+        });
+        setErrors(newErrors);
       }
-      return false
+      return false;
     }
-  }
+  };
 
   const handleAllocationChange = (id: string, value: number) => {
-    setAllocations((prev) => prev.map((item) => (item.id === id ? { ...item, percentage: value } : item)))
-  }
+    setAllocations((prev) =>
+      prev.map((item) =>
+        item.id === id ? { ...item, percentage: value } : item
+      )
+    );
+  };
 
   const handleNext = () => {
     if (activeTab === "setup") {
       if (validateSetup()) {
-        setActiveTab("allocation")
+        setActiveTab("allocation");
       }
     } else if (activeTab === "allocation") {
       if (isFullyAllocated) {
-        setActiveTab("preview")
+        setActiveTab("preview");
       }
     }
-  }
+  };
 
   const handleBack = () => {
-    if (activeTab === "allocation") setActiveTab("setup")
-    else if (activeTab === "preview") setActiveTab("allocation")
-  }
+    if (activeTab === "allocation") setActiveTab("setup");
+    else if (activeTab === "preview") setActiveTab("allocation");
+  };
   const handleCreateVault = async () => {
     console.log("Create vault attempt:", {
       ready,
       authenticated,
       isWalletReady,
       currentWallet: currentWallet?.address,
-      wallets: wallets.map(w => w.address)
+      wallets: wallets.map((w) => w.address),
     });
 
     if (!ready || !authenticated) {
@@ -205,13 +232,18 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
     let payer = new PublicKey(currentWallet.address);
 
     try {
-      const createInitializeVaultIx = await client?.createInitializeVaultIx(vaultParams, {
-        vault: vaultKeypair.publicKey,
-        vaultAssetMint: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
-        admin: payer,
-        manager: payer,
-        payer: payer,
-      });
+      const createInitializeVaultIx = await client?.createInitializeVaultIx(
+        vaultParams,
+        {
+          vault: vaultKeypair.publicKey,
+          vaultAssetMint: new PublicKey(
+            "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"
+          ),
+          admin: payer,
+          manager: payer,
+          payer: payer,
+        }
+      );
 
       const createAddAdaptorIx = await client?.createAddAdaptorIx({
         vault: vaultKeypair.publicKey,
@@ -232,7 +264,8 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
         units: 400000,
       });
 
-      const { lastValidBlockHeight, blockhash } = await connection.getLatestBlockhash();
+      const { lastValidBlockHeight, blockhash } =
+        await connection.getLatestBlockhash();
 
       const messageV0 = new TransactionMessage({
         payerKey: payer,
@@ -244,16 +277,17 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
       transaction.sign([vaultKeypair]);
 
       console.log("Sending transaction with wallet:", currentWallet.address);
-      
+
       try {
-
-        const txSig = await currentWallet.sendTransaction(transaction, connection);
+        const txSig = await currentWallet.sendTransaction(
+          transaction,
+          connection
+        );
         console.log("Transaction sent with signature:", txSig);
-
 
         let retries = 3;
         let confirmed = false;
-        
+
         while (retries > 0 && !confirmed) {
           try {
             const strategy: TransactionConfirmationStrategy = {
@@ -262,20 +296,25 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
               blockhash: blockhash,
             };
 
-            const confirmation = await connection.confirmTransaction(strategy, "confirmed");
+            const confirmation = await connection.confirmTransaction(
+              strategy,
+              "confirmed"
+            );
             if (confirmation.value.err) {
               throw new Error(`Transaction failed: ${confirmation.value.err}`);
             }
             confirmed = true;
             console.log("Transaction confirmed successfully");
           } catch (error) {
-            console.log(`Confirmation attempt failed, retries left: ${retries - 1}`);
+            console.log(
+              `Confirmation attempt failed, retries left: ${retries - 1}`
+            );
             retries--;
             if (retries === 0) {
               throw error;
             }
             // Wait before retrying
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise((resolve) => setTimeout(resolve, 2000));
           }
         }
 
@@ -285,52 +324,56 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
 
         try {
           const { data: latestPool, error: poolError } = await supabase
-            .from('pool_info')
-            .select('id')
-            .eq('type', 'abs_vault')
-            .order('id', { ascending: false })
+            .from("pool_info")
+            .select("id")
+            .eq("type", "abs_vault")
+            .order("id", { ascending: false })
             .limit(1);
 
           if (poolError) {
-            throw new Error(`Error fetching latest pool info: ${poolError.message}`);
+            throw new Error(
+              `Error fetching latest pool info: ${poolError.message}`
+            );
           }
 
-          const nextId = latestPool && latestPool.length > 0 ? latestPool[0].id + 1 : 1;
+          const nextId =
+            latestPool && latestPool.length > 0 ? latestPool[0].id + 1 : 1;
 
           const { error: poolInsertError } = await supabase
-            .from('pool_info')
+            .from("pool_info")
             .insert([
               {
                 id: nextId,
-                type: 'abs_vault',
-              }
+                type: "abs_vault",
+              },
             ]);
 
           if (poolInsertError) {
-            throw new Error(`Error inserting into pool_info: ${poolInsertError.message}`);
+            throw new Error(
+              `Error inserting into pool_info: ${poolInsertError.message}`
+            );
           }
 
           const { error: vaultError } = await supabase
-            .from('abs_vault_info')
+            .from("abs_vault_info")
             .insert([
               {
                 name: vaultParams.name,
                 address: vaultKeypair.publicKey.toBase58(),
                 pool_id: nextId,
                 org_id: 12,
-                underlying_token: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                underlying_token:
+                  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
                 capacity: vaultParams.config.maxCap.toString(),
-                adaptors: [
-                  "kamino-lend",
-                  "save",
-                  "drift-vault"
-                ],
-                allowed_pools: ["1088","1101","1071"],
-              }
+                adaptors: ["kamino-lend", "save", "drift-vault"],
+                allowed_pools: ["1088", "1101", "1071"],
+              },
             ]);
 
           if (vaultError) {
-            throw new Error(`Error storing vault in abs_vault_info: ${vaultError.message}`);
+            throw new Error(
+              `Error storing vault in abs_vault_info: ${vaultError.message}`
+            );
           }
 
           console.log("Vault successfully stored in both tables");
@@ -339,11 +382,9 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
           console.error("Error in vault storage process:", error);
           // You might want to add some UI feedback here for the error
         }
-
       } catch (error) {
         console.error("Error creating vault:", error);
       }
-
     } catch (error) {
       console.error("Error creating vault:", error);
     }
@@ -351,10 +392,9 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
     onClose();
   };
 
-
   const handleRemoveAllocation = (id: string) => {
-    setAllocations((prev) => prev.filter((item) => item.id !== id))
-  }
+    setAllocations((prev) => prev.filter((item) => item.id !== id));
+  };
 
   return (
     <AnimatePresence>
@@ -373,25 +413,40 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
             exit={{ scale: 0.9, opacity: 0 }}
             onClick={(e) => e.stopPropagation()}
           >
-            <button onClick={onClose} className="absolute right-4 top-4 text-gray-400 hover:text-white">
+            <button
+              onClick={onClose}
+              className="absolute right-4 top-4 text-gray-400 hover:text-white"
+            >
               <X className="h-5 w-5" />
             </button>
 
             <div className="mb-8 flex border-b border-gray-700">
               <button
-                className={`flex-1 px-4 py-4 text-sm font-medium ${activeTab === "setup" ? "border-b-2 border-white" : "text-gray-400"}`}
+                className={`flex-1 px-4 py-4 text-sm font-medium ${
+                  activeTab === "setup"
+                    ? "border-b-2 border-white"
+                    : "text-gray-400"
+                }`}
                 onClick={() => setActiveTab("setup")}
               >
                 Set Up
               </button>
               <button
-                className={`flex-1 px-4 py-4 text-sm font-medium ${activeTab === "allocation" ? "border-b-2 border-white" : "text-gray-400"}`}
+                className={`flex-1 px-4 py-4 text-sm font-medium ${
+                  activeTab === "allocation"
+                    ? "border-b-2 border-white"
+                    : "text-gray-400"
+                }`}
                 onClick={() => setActiveTab("allocation")}
               >
                 Allocation
               </button>
               <button
-                className={`flex-1 px-4 py-4 text-sm font-medium ${activeTab === "preview" ? "border-b-2 border-white" : "text-gray-400"}`}
+                className={`flex-1 px-4 py-4 text-sm font-medium ${
+                  activeTab === "preview"
+                    ? "border-b-2 border-white"
+                    : "text-gray-400"
+                }`}
                 onClick={() => setActiveTab("preview")}
               >
                 Preview
@@ -403,33 +458,51 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                 <div className="space-y-6">
                   <div className="space-y-2">
                     <h3 className="text-lg font-medium">Vault Name</h3>
-                    <p className="text-sm text-gray-400">What do you want to name your vault?</p>
+                    <p className="text-sm text-gray-400">
+                      What do you want to name your vault?
+                    </p>
                     <Input
                       placeholder="Type something"
-                      className={`mt-2 bg-[#2c2c2e] border-0 text-white placeholder:text-gray-500 ${errors.vaultName ? "ring-1 ring-red-500" : ""}`}
+                      className={`mt-2 bg-[#2c2c2e] border-0 text-white placeholder:text-gray-500 ${
+                        errors.vaultName ? "ring-1 ring-red-500" : ""
+                      }`}
                       value={vaultName}
                       onChange={(e) => setVaultName(e.target.value)}
                     />
-                    {errors.vaultName && <p className="text-xs text-red-500 mt-1">{errors.vaultName}</p>}
+                    {errors.vaultName && (
+                      <p className="text-xs text-red-500 mt-1">
+                        {errors.vaultName}
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">
                     <h3 className="text-lg font-medium">Description</h3>
-                    <p className="text-sm text-gray-400">What do you want your vault to look like?</p>
+                    <p className="text-sm text-gray-400">
+                      What do you want your vault to look like?
+                    </p>
                     <Textarea
                       placeholder="Type something"
-                      className={`mt-2 bg-[#2c2c2e] border-0 text-white placeholder:text-gray-500 min-h-[100px] ${errors.vaultDescription ? "ring-1 ring-red-500" : ""}`}
+                      className={`mt-2 bg-[#2c2c2e] border-0 text-white placeholder:text-gray-500 min-h-[100px] ${
+                        errors.vaultDescription ? "ring-1 ring-red-500" : ""
+                      }`}
                       value={vaultDescription}
                       onChange={(e) => setVaultDescription(e.target.value)}
                     />
-                    {errors.vaultDescription && <p className="text-xs text-red-500 mt-1">{errors.vaultDescription}</p>}
+                    {errors.vaultDescription && (
+                      <p className="text-xs text-red-500 mt-1">
+                        {errors.vaultDescription}
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-2 gap-6">
                     {/* Left Column */}
                     <div className="space-y-2">
                       <h3 className="text-lg font-medium">Underlying Token</h3>
-                      <p className="text-sm text-gray-400">Choose your preferred token</p>
+                      <p className="text-sm text-gray-400">
+                        Choose your preferred token
+                      </p>
                       <button className="flex w-full items-center justify-between rounded bg-[#2c2c2e] px-4 py-2 text-white">
                         <div className="flex items-center">
                           <div className="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs">
@@ -446,7 +519,9 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                       <h3 className="text-lg font-medium">Initial Deposit</h3>
                       <div className="relative">
                         <Input
-                          className={`bg-[#2c2c2e] pr-16 border-0 text-white ${errors.initialDeposit ? "ring-1 ring-red-500" : ""}`}
+                          className={`bg-[#2c2c2e] pr-16 border-0 text-white ${
+                            errors.initialDeposit ? "ring-1 ring-red-500" : ""
+                          }`}
                           value={initialDeposit}
                           onChange={(e) => setInitialDeposit(e.target.value)}
                         />
@@ -454,7 +529,11 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                           Max
                         </button>
                       </div>
-                      {errors.initialDeposit && <p className="text-xs text-red-500 mt-1">{errors.initialDeposit}</p>}
+                      {errors.initialDeposit && (
+                        <p className="text-xs text-red-500 mt-1">
+                          {errors.initialDeposit}
+                        </p>
+                      )}
                       <div className="flex justify-between text-sm">
                         <span className="text-gray-400">Balance</span>
                         <div className="flex items-center">
@@ -471,7 +550,9 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                 <div className="space-y-6">
                   <div>
                     <h3 className="text-xl font-medium">Allocation</h3>
-                    <p className="text-sm text-gray-400">Allocate your funds across different strategies</p>
+                    <p className="text-sm text-gray-400">
+                      Allocate your funds across different strategies
+                    </p>
                   </div>
 
                   <div className="relative">
@@ -486,14 +567,19 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                     <h4 className="text-sm font-medium">Total Allocation</h4>
                     <Badge
                       variant={isFullyAllocated ? "default" : "destructive"}
-                      className={`px-3 py-1 ${isFullyAllocated ? "bg-green-600" : "bg-yellow-600"}`}
+                      className={`px-3 py-1 ${
+                        isFullyAllocated ? "bg-green-600" : "bg-yellow-600"
+                      }`}
                     >
                       {totalAllocated}% allocated
                     </Badge>
                   </div>
 
                   {!isFullyAllocated && (
-                    <Alert variant="destructive" className="bg-yellow-100/90 text-yellow-800">
+                    <Alert
+                      variant="destructive"
+                      className="bg-yellow-100/90 text-yellow-800"
+                    >
                       <AlertCircle className="h-4 w-4 font-bold" />
                       <AlertDescription>
                         <span className="text-yellow-800">
@@ -505,15 +591,24 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
 
                   <div className="space-y-4">
                     {allocations.map((allocation) => (
-                      <div key={allocation.id} className="bg-[#2c2c2e] rounded-lg p-4">
+                      <div
+                        key={allocation.id}
+                        className="bg-[#2c2c2e] rounded-lg p-4"
+                      >
                         <div className="flex justify-between items-center mb-3">
                           <div className="flex items-center gap-2">
                             <div className="h-8 w-8 rounded-full bg-blue-500 flex items-center justify-center">
-                              <span className="text-xs">{allocation.tokenIcon}</span>
+                              <span className="text-xs">
+                                {allocation.tokenIcon}
+                              </span>
                             </div>
                             <div>
-                              <div className="font-medium">{allocation.name}</div>
-                              <div className="text-xs text-gray-400">{allocation.strategy}</div>
+                              <div className="font-medium">
+                                {allocation.name}
+                              </div>
+                              <div className="text-xs text-gray-400">
+                                {allocation.strategy}
+                              </div>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
@@ -524,7 +619,9 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                               variant="ghost"
                               size="icon"
                               className="h-6 w-6"
-                              onClick={() => handleRemoveAllocation(allocation.id)}
+                              onClick={() =>
+                                handleRemoveAllocation(allocation.id)
+                              }
                             >
                               <ChevronDown className="h-4 w-4 text-gray-400" />
                             </Button>
@@ -536,7 +633,9 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                             min={0}
                             max={100}
                             step={1}
-                            onValueChange={(value) => handleAllocationChange(allocation.id, value[0])}
+                            onValueChange={(value) =>
+                              handleAllocationChange(allocation.id, value[0])
+                            }
                             className="cursor-pointer"
                           />
                         </div>
@@ -558,15 +657,21 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                 <div className="space-y-6">
                   <div>
                     <h3 className="text-xl font-medium">Vault Preview</h3>
-                    <p className="text-sm text-gray-400">Review your vault configuration before creating</p>
+                    <p className="text-sm text-gray-400">
+                      Review your vault configuration before creating
+                    </p>
                   </div>
 
                   <Card className="bg-[#2c2c2e] border-0 overflow-hidden">
                     <CardContent>
                       <div className="flex justify-between items-start mb-4">
                         <div>
-                          <h3 className="text-xl font-semibold text-white">{vaultName || "Untitled Vault"}</h3>
-                          <p className="text-sm text-gray-400 mt-1">{vaultDescription || "No description"}</p>
+                          <h3 className="text-xl font-semibold text-white">
+                            {vaultName || "Untitled Vault"}
+                          </h3>
+                          <p className="text-sm text-gray-400 mt-1">
+                            {vaultDescription || "No description"}
+                          </p>
                         </div>
                         <Badge className="bg-green-600">Ready</Badge>
                       </div>
@@ -575,26 +680,38 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
 
                       <div className="space-y-4">
                         <div>
-                          <h4 className="text-sm font-medium text-gray-400 mb-2">Vault Details</h4>
+                          <h4 className="text-sm font-medium text-gray-400 mb-2">
+                            Vault Details
+                          </h4>
                           <div className="grid grid-cols-2 gap-4">
                             <div className="bg-[#3c3c3e] rounded-lg p-3">
-                              <p className="text-xs text-gray-400">Underlying Token</p>
+                              <p className="text-xs text-gray-400">
+                                Underlying Token
+                              </p>
                               <div className="flex items-center mt-1">
                                 <div className="mr-2 flex h-5 w-5 items-center justify-center rounded-full bg-blue-500 text-xs">
                                   Ⓤ
                                 </div>
-                                <span className="font-medium text-white">USDC</span>
+                                <span className="font-medium text-white">
+                                  USDC
+                                </span>
                               </div>
                             </div>
                             <div className="bg-[#3c3c3e] rounded-lg p-3">
-                              <p className="text-xs text-gray-400">Initial Deposit</p>
-                              <p className="font-medium mt-1 text-white">{initialDeposit || "0"} USDC</p>
+                              <p className="text-xs text-gray-400">
+                                Initial Deposit
+                              </p>
+                              <p className="font-medium mt-1 text-white">
+                                {initialDeposit || "0"} USDC
+                              </p>
                             </div>
                           </div>
                         </div>
 
                         <div>
-                          <h4 className="text-sm font-medium text-gray-400 mb-2">Allocation Strategy</h4>
+                          <h4 className="text-sm font-medium text-gray-400 mb-2">
+                            Allocation Strategy
+                          </h4>
                           <div className="space-y-2">
                             {allocations.map((allocation, index) => (
                               <div
@@ -603,14 +720,23 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                               >
                                 <div className="flex items-center gap-3">
                                   <div className="h-6 w-6 rounded-full bg-blue-500 flex items-center justify-center">
-                                    <span className="text-xs">{allocation.tokenIcon}</span>
+                                    <span className="text-xs">
+                                      {allocation.tokenIcon}
+                                    </span>
                                   </div>
                                   <div>
-                                    <div className="font-medium text-white">{allocation.name}</div>
-                                    <div className="text-xs text-gray-400">{allocation.strategy}</div>
+                                    <div className="font-medium text-white">
+                                      {allocation.name}
+                                    </div>
+                                    <div className="text-xs text-gray-400">
+                                      {allocation.strategy}
+                                    </div>
                                   </div>
                                 </div>
-                                <Badge variant="outline" className="bg-blue-100/90 border-blue-500/30">
+                                <Badge
+                                  variant="outline"
+                                  className="bg-blue-100/90 border-blue-500/30"
+                                >
                                   {allocation.percentage}%
                                 </Badge>
                               </div>
@@ -619,7 +745,9 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                         </div>
 
                         <div>
-                          <h4 className="text-sm font-medium text-gray-400 mb-2">Allocation Distribution</h4>
+                          <h4 className="text-sm font-medium text-gray-400 mb-2">
+                            Allocation Distribution
+                          </h4>
                           <div className="h-8 bg-[#3c3c3e] rounded-full overflow-hidden flex">
                             {allocations.map((allocation, index) => (
                               <div
@@ -627,10 +755,17 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                                 className="h-full flex items-center justify-center text-xs font-medium text-white"
                                 style={{
                                   width: `${allocation.percentage}%`,
-                                  backgroundColor: index === 0 ? "#3b82f6" : index === 1 ? "#6366f1" : "#8b5cf6",
+                                  backgroundColor:
+                                    index === 0
+                                      ? "#3b82f6"
+                                      : index === 1
+                                      ? "#6366f1"
+                                      : "#8b5cf6",
                                 }}
                               >
-                                {allocation.percentage > 10 ? `${allocation.percentage}%` : ""}
+                                {allocation.percentage > 10
+                                  ? `${allocation.percentage}%`
+                                  : ""}
                               </div>
                             ))}
                           </div>
@@ -664,7 +799,10 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                   Next <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
               ) : (
-                <Button onClick={handleCreateVault} className="bg-green-600 hover:bg-green-700 cursor-pointer">
+                <Button
+                  onClick={handleCreateVault}
+                  className="bg-green-600 hover:bg-green-700 cursor-pointer"
+                >
                   Create Vault
                 </Button>
               )}
@@ -673,5 +811,5 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
         </motion.div>
       )}
     </AnimatePresence>
-  )
+  );
 }

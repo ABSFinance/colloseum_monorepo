@@ -1,20 +1,26 @@
-"use client"
+"use client";
 
-import type { ReactNode } from "react"
-import { motion } from "framer-motion"
-import { Card, CardContent } from "@/components/ui/card"
-import { TrendingUp, TrendingDown } from "lucide-react"
+import type { ReactNode } from "react";
+import { motion } from "framer-motion";
+import { Card, CardContent } from "@/components/ui/card";
+import { TrendingUp, TrendingDown } from "lucide-react";
 
 interface StatCardProps {
-  icon: ReactNode
-  title: string
-  value: string | number
-  percentChange?: number
-  delay?: number
+  icon: ReactNode;
+  title: string;
+  value: string | number;
+  percentChange?: number;
+  delay?: number;
 }
 
-export function StatCard({ icon, title, value, percentChange, delay = 0 }: StatCardProps) {
-  const isPositive = percentChange ? percentChange > 0 : false
+export function StatCard({
+  icon,
+  title,
+  value,
+  percentChange,
+  delay = 0,
+}: StatCardProps) {
+  const isPositive = percentChange ? percentChange > 0 : false;
 
   const cardVariants = {
     hidden: { opacity: 0, y: 20 },
@@ -28,7 +34,7 @@ export function StatCard({ icon, title, value, percentChange, delay = 0 }: StatC
         delay,
       },
     },
-  }
+  };
 
   return (
     <motion.div variants={cardVariants} initial="hidden" animate="visible">
@@ -49,12 +55,18 @@ export function StatCard({ icon, title, value, percentChange, delay = 0 }: StatC
             </motion.h2>
             {percentChange !== undefined && (
               <motion.div
-                className={`flex items-center ${isPositive ? "text-green-400" : "text-red-400"}`}
+                className={`flex items-center ${
+                  isPositive ? "text-green-400" : "text-red-400"
+                }`}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ delay: delay + 0.2 }}
               >
-                {isPositive ? <TrendingUp className="h-4 w-4 mr-1" /> : <TrendingDown className="h-4 w-4 mr-1" />}
+                {isPositive ? (
+                  <TrendingUp className="h-4 w-4 mr-1" />
+                ) : (
+                  <TrendingDown className="h-4 w-4 mr-1" />
+                )}
                 <span>{Math.abs(percentChange)}%</span>
               </motion.div>
             )}
@@ -62,5 +74,5 @@ export function StatCard({ icon, title, value, percentChange, delay = 0 }: StatC
         </CardContent>
       </Card>
     </motion.div>
-  )
+  );
 }

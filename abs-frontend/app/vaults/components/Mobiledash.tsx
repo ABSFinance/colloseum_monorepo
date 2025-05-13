@@ -1,9 +1,8 @@
-"use client"
-import MobileSidebar from "@/components/Mobile-sidebar"
-import FinancialDashboard from "./FinancialDashboard"
+"use client";
+import MobileSidebar from "@/components/Mobile-sidebar";
+import FinancialDashboard from "./FinancialDashboard";
 
 export default function MobileDashboard() {
-
   return (
     <div className="min-h-screen bg-black text-white md:hidden">
       <header className="border-b border-gray-800 p-4 flex justify-between items-center">
@@ -18,5 +17,5 @@ export default function MobileDashboard() {
       </header>
       <FinancialDashboard />
     </div>
-  )
+  );
 }
