@@ -1,12 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { ArrowLeft, Info, TrendingUp, BarChart3, DollarSign, Clock, Zap, ChevronRight } from "lucide-react"
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card"
+import { useEffect, useMemo, useState } from "react"
+import { ArrowLeft } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
-import { Separator } from "@/components/ui/separator"
 import { PieChart, Pie, Cell, XAxis, YAxis, ResponsiveContainer, Tooltip, Area, AreaChart } from "recharts"
 import { cn } from "@/lib/utils"
 import Sidebar from "@/components/Sidebar"
@@ -23,6 +22,8 @@ export default function CryptoDashboard() {
     const { vaultid, poolid } = useParams() as { vaultid: string, poolid: string };
     const [vaultData, setVaultData] = useState<VaultInfo>();
     const [userVaultData, setUserVaultData] = useState<any>(null)
+    const [lendingpoolname, setlendingpoolname] = useState<any>();
+
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -38,40 +39,77 @@ export default function CryptoDashboard() {
                 .single()
 
             const { data: userVault, error: userVaultError } = await supabase
-                .from("abs_vault_allocation_history ")
+                .from("abs_vault_allocation_history")
                 .select("*")
                 .eq("pool_id", poolid);
 
-            if (vaultError || userVaultError) {
-                console.error("Supabase fetch error:", vaultError || userVaultError)
+            const allocatedPoolIds = userVault?.map((item) => item.allocated_pool_id) ?? [];
+
+            const { data: lend_data, error: lend_data_error } = await supabase
+                .from("lending_pool_info")
+                .select("*")
+                .in("pool_id", allocatedPoolIds);
+
+            if (vaultError || userVaultError || lend_data_error) {
+                console.error("Supabase fetch error:", vaultError || userVaultError || lend_data_error);
             } else {
-                console.log(vault, userVault);
                 setVaultData(vault)
-                setUserVaultData(userVault)
+                setUserVaultData(userVault);
+                setlendingpoolname(lend_data);
             }
 
             setLoading(false)
         }
 
         fetchData()
-    }, [vaultid,poolid]);
+    }, [vaultid, poolid]);
 
-    console.log(vaultData, userVaultData);
+    console.log(vaultData, userVaultData, lendingpoolname);
 
     console.log("pool id ", poolid, "vault id", vaultid);
 
     // Vault allocation data
-    const allocationData = [
-        { name: "Kamino Lend USDC", value: 15.2, color: "#8b5cf6" },
-        { name: "Kamino Market USDT", value: 12.7, color: "#f97316" },
-        { name: "Kamino Lend USDC", value: 7.4, color: "#10b981" },
-        { name: "Kamino Lend USDC", value: 5.2, color: "#7c3aed" },
-        { name: "Kamino Lend USDC", value: 23, color: "#0ea5e9" },
-        { name: "Lend JP-Market USDC", value: 19.2, color: "#22c55e" },
-        { name: "Kamino Lend USDC", value: 10, color: "#a3e635" },
-        { name: "Kamino Lend USDC", value: 22, color: "#ffffff" },
-        { name: "Kamino Lend USDC", value: 8.4, color: "#3b82f6" },
-    ]
+    const COLORS = ["#f43f5e", "#8b5cf6", "#22d3ee", "#34d399", "#facc15", "#fb923c"];
+    const allocationData = useMemo(() => {
+        const vaultData = userVaultData ?? [];
+        const lendingData = lendingpoolname ?? [];
+
+        if (vaultData.length === 0 || lendingData.length === 0) {
+            return [
+                {
+                    name: "No Allocation",
+                    value: NaN,
+                    color: "#fff",
+                },
+            ];
+        }
+
+        const total = vaultData.reduce((sum, item) => sum + item.amount, 0);
+
+        if (total === 0) {
+            return [
+                {
+                    name: "No Allocation",
+                    value: NaN,
+                    color: "#fff",
+                },
+            ];
+        }
+
+        return vaultData.map((item, index) => {
+            const poolInfo = lendingData.find(p => p.pool_id === item.allocated_pool_id);
+            const poolName = poolInfo?.name || `Pool ${item.allocated_pool_id}`;
+
+            return {
+                name: poolName,
+                value: parseFloat(((item.amount / total) * 100).toFixed(2)),
+                color: COLORS[index % COLORS.length],
+            };
+        });
+    }, [userVaultData, lendingpoolname]);
+
+
+
 
     // Performance data with more variation for better visualization
     const performanceData = [
@@ -82,22 +120,6 @@ export default function CryptoDashboard() {
         { day: "May 5", value: 33.3, volume: 1900 },
         { day: "May 6", value: 33.6, volume: 2400 },
         { day: "May 7", value: 33.1, volume: 1600 },
-    ]
-
-    // Vault details
-    const vaultDetails = [
-        { label: "Current Vault Price", value: "$770", unit: "per SOL", icon: <DollarSign className="h-4 w-4" /> },
-        { label: "Protocol", value: "Drift Protocol", icon: <BarChart3 className="h-4 w-4" /> },
-        { label: "Capacity", value: "75%", icon: <TrendingUp className="h-4 w-4" /> },
-        { label: "APY", value: "3.82%", icon: <Zap className="h-4 w-4" /> },
-        { label: "Age", value: "90D", icon: <Clock className="h-4 w-4" /> },
-    ]
-
-    // Recent transactions
-    const recentTransactions = [
-        { type: "Deposit", amount: "+2.5 SOL", value: "$1,925", time: "2h ago", status: "completed" },
-        { type: "Withdraw", amount: "-1.2 SOL", value: "$924", time: "1d ago", status: "completed" },
-        { type: "Deposit", amount: "+0.8 SOL", value: "$616", time: "3d ago", status: "completed" },
     ]
 
     return (
@@ -243,9 +265,9 @@ export default function CryptoDashboard() {
                                     <div className="w-full md:w-1/2 grid grid-cols-2 gap-3">
                                         {allocationData.map((item, index) => (
                                             <div key={index} className="flex items-center gap-2">
-                                                <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: item.color }}></div>
+                                                <div className="w-5 h-5 rounded-sm" style={{ backgroundColor: item.color }}></div>
                                                 <div className="flex flex-col">
-                                                    <span className="text-xs text-zinc-300">{item.name}</span>
+                                                    <span className="text-sm text-zinc-300">{item.name}</span>
                                                     <span className="text-sm font-medium">{item.value}%</span>
                                                 </div>
                                             </div>
@@ -254,6 +276,7 @@ export default function CryptoDashboard() {
                                 </div>
                             </CardContent>
                         </Card>
+
                     </div>
 
                     <div className="space-y-6">
@@ -317,15 +340,6 @@ export default function CryptoDashboard() {
                                             </div>
                                         </div>
 
-                                        <div className="space-y-2">
-                                            <div className="flex justify-between text-sm">
-                                                <span>You will receive (estimated)</span>
-                                            </div>
-                                            <div className="bg-zinc-900/80 border border-zinc-700 rounded-md p-3 flex justify-between items-center">
-                                                <span className="text-lg">1.61 SOL</span>
-                                                <span className="text-sm text-zinc-400">≈ $1,240</span>
-                                            </div>
-                                        </div>
 
                                         <Button className="w-full h-12 bg-white text-black hover:bg-slate-200 hover:text-black cursor-pointer shadow-lg shadow-blue-700/20">
                                             Connect Wallet to Deposit
@@ -367,73 +381,6 @@ export default function CryptoDashboard() {
                             </CardContent>
                         </Card>
 
-                        {/* Vault Details */}
-                        <Card className="bg-zinc-800/50 border-zinc-700/50 backdrop-blur-sm">
-                            <CardHeader>
-                                <CardTitle className="text-lg font-medium text-white">Vault Details</CardTitle>
-                                <CardDescription className="text-zinc-400">Current vault statistics</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {vaultDetails.map((detail, index) => (
-                                    <div key={index}>
-                                        <div className="flex justify-between items-center py-2">
-                                            <div className="flex items-center gap-2 text-zinc-400">
-                                                {detail.icon}
-                                                <span>{detail.label}</span>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                {detail.label === "Current Vault Price" && <Info className="h-4 w-4 text-blue-400" />}
-                                                <div className="flex items-center gap-1">
-                                                    <span className="font-medium text-white">{detail.value}</span>
-                                                    {detail.unit && <span className="text-sm text-white">{detail.unit}</span>}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        {index < vaultDetails.length - 1 && <Separator className="bg-zinc-700/50" />}
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
-
-                        {/* Recent Transactions */}
-                        <Card className="bg-zinc-800/50 border-zinc-700/50 backdrop-blur-sm text-white">
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-lg font-medium">Recent Transactions</CardTitle>
-                                <CardDescription className="text-zinc-400">Your latest activity</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {recentTransactions.map((tx, index) => (
-                                    <div key={index} className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div
-                                                className={cn(
-                                                    "h-8 w-8 rounded-full flex items-center justify-center",
-                                                    tx.type === "Deposit" ? "bg-green-500/20 text-green-400" : "bg-red-500/20 text-red-400",
-                                                )}
-                                            >
-                                                {tx.type === "Deposit" ? "+" : "-"}
-                                            </div>
-                                            <div>
-                                                <p className="font-medium">{tx.type}</p>
-                                                <p className="text-xs text-zinc-400">{tx.time}</p>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className={cn("font-medium", tx.type === "Deposit" ? "text-green-400" : "text-red-400")}>
-                                                {tx.amount}
-                                            </p>
-                                            <p className="text-xs text-zinc-400">{tx.value}</p>
-                                        </div>
-                                    </div>
-                                ))}
-                            </CardContent>
-                            <CardFooter className="pt-0">
-                                <Button variant="secondary" className="w-full border-zinc-700 hover:bg-slate-200 cursor-pointer">
-                                    View All Transactions
-                                    <ChevronRight className="h-4 w-4 ml-2" />
-                                </Button>
-                            </CardFooter>
-                        </Card>
                     </div>
                 </div>
             </div>

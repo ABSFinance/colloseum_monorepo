@@ -13,12 +13,11 @@ import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { BN } from "@coral-xyz/anchor";
-import { AddressLookupTableAccount, ComputeBudgetProgram, Keypair, PublicKey, Transaction, TransactionConfirmationStrategy, TransactionInstruction, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
+import {  ComputeBudgetProgram, Keypair, PublicKey, TransactionConfirmationStrategy, TransactionInstruction, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 import {  connection, useVoltrClientStore } from "@/components/hooks/useVoltrClientStore"
 import { useSolanaWallets, usePrivy } from "@privy-io/react-auth"
 import { supabase } from "@/lib/supabase"
 import { useSendTransaction } from "@privy-io/react-auth/solana"
-import { setupAddressLookupTable } from "@/lib/helper"
 
 interface CreateVaultModalProps {
   isOpen: boolean
