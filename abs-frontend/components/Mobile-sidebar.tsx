@@ -1,24 +1,25 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { Menu, X } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { Menu, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 export default function MobileSidebar() {
-  const pathname = usePathname()
-  const [isOpen, setIsOpen] = useState(false)
-  const navItems = [
-    { name: "All Vaults", path: "/dashboard/vaults", icon: "shield" },
-    // { name: "Dashboard", path: "/dashboard", icon: "home" },
-    // { name: "Reward Center", path: "/rewards", icon: "gift" },
-  ]
+  const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
+  const navItems = [{ name: "All Vaults", path: "/vaults", icon: "shield" }];
 
   return (
     <div className="md:hidden">
-      <Button variant="ghost" size="icon" className="text-white" onClick={() => setIsOpen(true)}>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="text-white"
+        onClick={() => setIsOpen(true)}
+      >
         <Menu className="h-6 w-6" />
         <span className="sr-only">Open menu</span>
       </Button>
@@ -39,7 +40,11 @@ export default function MobileSidebar() {
                   </div>
                   <span className="text-lg font-bold">ABS Finance</span>
                 </div>
-                <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => setIsOpen(false)}
+                >
                   <X className="h-6 w-6" />
                   <span className="sr-only">Close menu</span>
                 </Button>
@@ -48,14 +53,18 @@ export default function MobileSidebar() {
               <nav className="flex-1 overflow-auto p-4">
                 <ul className="space-y-2">
                   {navItems.map((item) => (
-                    <motion.li key={item.path} whileHover={{ x: 5 }} whileTap={{ scale: 0.95 }}>
+                    <motion.li
+                      key={item.path}
+                      whileHover={{ x: 5 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
                       <Link
                         href={item.path}
                         className={cn(
                           "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
                           pathname === item.path
                             ? "bg-gray-800 text-white"
-                            : "text-gray-400 hover:text-white hover:bg-gray-800/50",
+                            : "text-gray-400 hover:text-white hover:bg-gray-800/50"
                         )}
                         onClick={() => setIsOpen(false)}
                       >
@@ -71,7 +80,7 @@ export default function MobileSidebar() {
         )}
       </AnimatePresence>
     </div>
-  )
+  );
 }
 
 function Icon({ name }: { name: string }) {
@@ -91,7 +100,7 @@ function Icon({ name }: { name: string }) {
         >
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
         </svg>
-      )
+      );
     case "home":
       return (
         <svg
@@ -108,7 +117,7 @@ function Icon({ name }: { name: string }) {
           <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
           <polyline points="9 22 9 12 15 12 15 22" />
         </svg>
-      )
+      );
     case "gift":
       return (
         <svg
@@ -128,8 +137,8 @@ function Icon({ name }: { name: string }) {
           <path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z" />
           <path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z" />
         </svg>
-      )
+      );
     default:
-      return null
+      return null;
   }
 }
