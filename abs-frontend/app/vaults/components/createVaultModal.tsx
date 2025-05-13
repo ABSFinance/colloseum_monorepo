@@ -500,26 +500,37 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                     {/* Left Column */}
                     <div className="space-y-2">
                       <h3 className="text-lg font-medium">Underlying Token</h3>
-                      <p className="text-sm text-gray-400">
-                        Choose your preferred token
-                      </p>
-                      <button className="flex w-full items-center justify-between rounded bg-[#2c2c2e] px-4 py-2 text-white">
-                        <div className="flex items-center">
-                          <div className="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs">
-                            Ⓤ
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-400">
+                          Choose your preferred token
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <button className="flex w-full items-center justify-between rounded bg-[#2c2c2e] px-4 py-2 text-white h-10">
+                          <div className="flex items-center">
+                            <div className="mr-2 flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-xs">
+                              Ⓤ
+                            </div>
+                            USDC
                           </div>
-                          USDC
-                        </div>
-                        <ChevronDown className="h-4 w-4 text-gray-400" />
-                      </button>
+                          <ChevronDown className="h-4 w-4 text-gray-400" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Right Column */}
-                    <div className="space-y-2 mt-2">
+                    <div className="space-y-2">
                       <h3 className="text-lg font-medium">Initial Deposit</h3>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-gray-400">Balance</span>
+                        <div className="flex items-center">
+                          <div className="mr-1 h-3 w-3 rounded-sm bg-teal-500" />
+                          13,530
+                        </div>
+                      </div>
                       <div className="relative">
                         <Input
-                          className={`bg-[#2c2c2e] pr-16 border-0 text-white ${
+                          className={`bg-[#2c2c2e] pr-16 border-0 text-white h-10 ${
                             errors.initialDeposit ? "ring-1 ring-red-500" : ""
                           }`}
                           value={initialDeposit}
@@ -534,13 +545,6 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
                           {errors.initialDeposit}
                         </p>
                       )}
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-400">Balance</span>
-                        <div className="flex items-center">
-                          <div className="mr-1 h-3 w-3 rounded-sm bg-teal-500" />
-                          13,530
-                        </div>
-                      </div>
                     </div>
                   </div>
                 </div>
