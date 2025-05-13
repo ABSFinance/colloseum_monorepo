@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import { z } from "zod"
 import { Button } from "@/components/ui/button"
@@ -13,11 +13,12 @@ import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { BN } from "@coral-xyz/anchor";
-import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
+import { AddressLookupTableAccount, ComputeBudgetProgram, Keypair, PublicKey, Transaction, TransactionConfirmationStrategy, TransactionInstruction, TransactionMessage, VersionedTransaction } from "@solana/web3.js";
 import {  connection, useVoltrClientStore } from "@/components/hooks/useVoltrClientStore"
-import { useSolanaWallets } from "@privy-io/react-auth"
+import { useSolanaWallets, usePrivy } from "@privy-io/react-auth"
 import { supabase } from "@/lib/supabase"
 import { useSendTransaction } from "@privy-io/react-auth/solana"
+import { setupAddressLookupTable } from "@/lib/helper"
 
 interface CreateVaultModalProps {
   isOpen: boolean
@@ -74,10 +75,47 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
       tokenIcon: "E",
     },
   ]);
+
+  const { user, ready, authenticated } = usePrivy();
   const { wallets } = useSolanaWallets();
+  const { sendTransaction: privySendTransaction } = useSendTransaction();
+  const [isWalletReady, setIsWalletReady] = useState(false);
+  const [currentWallet, setCurrentWallet] = useState<any>(null);
+
+  useEffect(() => {
+    const checkWallet = async () => {
+      console.log("Checking Privy state:", {
+        ready,
+        authenticated,
+        userAddress: user?.wallet?.address,
+        wallets: wallets.map(w => w.address)
+      });
+
+      if (!ready) {
+        console.log("Privy not ready yet");
+        return;
+      }
+
+      if (!authenticated) {
+        console.log("User not authenticated with Privy");
+        return;
+      }
+
+      if (wallets.length > 0) {
+        const wallet = wallets[0];
+        console.log("Using wallet:", wallet.address);
+        setCurrentWallet(wallet);
+        setIsWalletReady(true);
+      } else {
+        console.log("No wallets available");
+        setCurrentWallet(null);
+        setIsWalletReady(false);
+      }
+    };
+    checkWallet();
+  }, [wallets, ready, authenticated, user]);
 
   const client = useVoltrClientStore((state) => state.client);
-
 
   const totalAllocated = allocations.reduce((sum, item) => sum + item.percentage, 0)
   const isFullyAllocated = totalAllocated === 100
@@ -126,90 +164,189 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
     else if (activeTab === "preview") setActiveTab("allocation")
   }
   const handleCreateVault = async () => {
+    console.log("Create vault attempt:", {
+      ready,
+      authenticated,
+      isWalletReady,
+      currentWallet: currentWallet?.address,
+      wallets: wallets.map(w => w.address)
+    });
+
+    if (!ready || !authenticated) {
+      console.log("Privy not ready or user not authenticated");
+      return;
+    }
+
+    if (!isWalletReady || !currentWallet) {
+      console.log("Wallet not ready or not connected");
+      return;
+    }
+
     const vaultParams = {
       config: {
-        maxCap: new BN("1000000000"), // Maximum total assets
-        startAtTs: new BN(Math.floor(Date.now() / 1000)), // Time when vault becomes active
-        lockedProfitDegradationDuration: new BN(3600), // 1 hour
-        managerManagementFee: 50, // 0.5%
-        managerPerformanceFee: 1000, // 10%
-        adminManagementFee: 50, // 0.5%
-        adminPerformanceFee: 1000, // 10%
-        redemptionFee: 10, // 0.1%
-        issuanceFee: 10, // 0.1%
-        withdrawalWaitingPeriod: new BN(3600), // 1 hour
+        maxCap: new BN("1000000000"),
+        startAtTs: new BN(Math.floor(Date.now() / 1000)),
+        lockedProfitDegradationDuration: new BN(3600),
+        managerManagementFee: 50,
+        managerPerformanceFee: 1000,
+        adminManagementFee: 50,
+        adminPerformanceFee: 1000,
+        redemptionFee: 10,
+        issuanceFee: 10,
+        withdrawalWaitingPeriod: new BN(3600),
       },
       name: vaultName,
       description: vaultDescription,
     };
 
     console.log("Vault Params:", vaultParams);
+    console.log("Current wallet address:", currentWallet.address);
 
     const vaultKeypair = Keypair.generate();
+    let payer = new PublicKey(currentWallet.address);
 
-    // Check if wallets are connected
-    if (wallets.length > 0 && wallets[0].address) {
+    try {
+      const createInitializeVaultIx = await client?.createInitializeVaultIx(vaultParams, {
+        vault: vaultKeypair.publicKey,
+        vaultAssetMint: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
+        admin: payer,
+        manager: payer,
+        payer: payer,
+      });
+
+      const createAddAdaptorIx = await client?.createAddAdaptorIx({
+        vault: vaultKeypair.publicKey,
+        admin: payer,
+        payer: payer,
+      });
+
+      if (!createInitializeVaultIx || !createAddAdaptorIx) {
+        console.error("Failed to create vault initialization instruction");
+        return;
+      }
+
+      const transactionIxs: TransactionInstruction[] = [];
+      transactionIxs.push(createInitializeVaultIx);
+      transactionIxs.push(createAddAdaptorIx);
+
+      const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
+        units: 400000,
+      });
+
+      const { lastValidBlockHeight, blockhash } = await connection.getLatestBlockhash();
+
+      const messageV0 = new TransactionMessage({
+        payerKey: payer,
+        recentBlockhash: blockhash,
+        instructions: [modifyComputeUnits, ...transactionIxs],
+      }).compileToV0Message([]);
+
+      const transaction = new VersionedTransaction(messageV0);
+      transaction.sign([vaultKeypair]);
+
+      console.log("Sending transaction with wallet:", currentWallet.address);
+      
       try {
-        // Create initialization instruction
-        const ix = await client?.createInitializeVaultIx(vaultParams, {
-          vault: vaultKeypair.publicKey,
-          vaultAssetMint: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"), // USDC on mainnet
-          admin: new PublicKey(wallets[0].address),
-          manager: new PublicKey(wallets[0].address),
-          payer: new PublicKey(wallets[0].address),
-        });
 
-        // Check if instruction is created
-        if (!ix) {
-          console.error("Failed to create vault initialization instruction");
-          return;
+        const txSig = await currentWallet.sendTransaction(transaction, connection);
+        console.log("Transaction sent with signature:", txSig);
+
+
+        let retries = 3;
+        let confirmed = false;
+        
+        while (retries > 0 && !confirmed) {
+          try {
+            const strategy: TransactionConfirmationStrategy = {
+              signature: txSig,
+              lastValidBlockHeight,
+              blockhash: blockhash,
+            };
+
+            const confirmation = await connection.confirmTransaction(strategy, "confirmed");
+            if (confirmation.value.err) {
+              throw new Error(`Transaction failed: ${confirmation.value.err}`);
+            }
+            confirmed = true;
+            console.log("Transaction confirmed successfully");
+          } catch (error) {
+            console.log(`Confirmation attempt failed, retries left: ${retries - 1}`);
+            retries--;
+            if (retries === 0) {
+              throw error;
+            }
+            // Wait before retrying
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
         }
 
-        console.log("Vault Initialization Instruction:", ix);
+        if (!confirmed) {
+          console.log("Transaction confirmation failed after all retries");
+        }
 
-        // Construct the transaction
-        // const transaction = new Transaction().add(ix);
+        try {
+          const { data: latestPool, error: poolError } = await supabase
+            .from('pool_info')
+            .select('id')
+            .eq('type', 'abs_vault')
+            .order('id', { ascending: false })
+            .limit(1);
 
-        // Send the transaction
+          if (poolError) {
+            throw new Error(`Error fetching latest pool info: ${poolError.message}`);
+          }
 
-        const transaction = new Transaction();
+          const nextId = latestPool && latestPool.length > 0 ? latestPool[0].id + 1 : 1;
 
-        const receipt = await sendTransaction({
-          transaction: transaction,
-          connection: connection
-      });
-      
-      console.log("Transaction sent with signature:", receipt.signature);
-        // Wait for the transaction to be confirmed
-        // await connection.confirmTransaction(signature);
+          const { error: poolInsertError } = await supabase
+            .from('pool_info')
+            .insert([
+              {
+                id: nextId,
+                type: 'abs_vault',
+              }
+            ]);
 
-        // console.log("Vault transaction successful with signature:", signature);
+          if (poolInsertError) {
+            throw new Error(`Error inserting into pool_info: ${poolInsertError.message}`);
+          }
 
-        // Now store the vault in Supabase DB
-        const { data, error } = await supabase
-          .from('abs_vault_info')
-          .insert([
-            {
-              vault_name: vaultParams.name,
-              vault_description: vaultParams.description,
-              vault_address: vaultKeypair.publicKey.toBase58(),
-              creator_address: wallets[0].address,
-              max_cap: vaultParams.config.maxCap.toString(),
-              start_at_ts: vaultParams.config.startAtTs.toString(),
-            },
-          ]);
+          const { error: vaultError } = await supabase
+            .from('abs_vault_info')
+            .insert([
+              {
+                name: vaultParams.name,
+                address: vaultKeypair.publicKey.toBase58(),
+                pool_id: nextId,
+                org_id: 12,
+                underlying_token: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+                capacity: vaultParams.config.maxCap.toString(),
+                adaptors: [
+                  "kamino-lend",
+                  "save",
+                  "drift-vault"
+                ],
+                allowed_pools: ["1088","1101","1071"],
+              }
+            ]);
 
-        if (error) {
-          console.error("Error storing vault in Supabase:", error);
-        } else {
-          console.log("Vault stored in Supabase:", data);
+          if (vaultError) {
+            throw new Error(`Error storing vault in abs_vault_info: ${vaultError.message}`);
+          }
+
+          console.log("Vault successfully stored in both tables");
+          onClose(); // Close the modal after successful storage
+        } catch (error) {
+          console.error("Error in vault storage process:", error);
+          // You might want to add some UI feedback here for the error
         }
 
       } catch (error) {
         console.error("Error creating vault:", error);
       }
-    } else {
-      console.log("Wallet not connected yet");
+
+    } catch (error) {
+      console.error("Error creating vault:", error);
     }
 
     onClose();

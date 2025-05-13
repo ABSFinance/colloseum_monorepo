@@ -60,3 +60,6 @@ __init__.py
 
 # Keep example env file
 !.env.example 
+
+node_modules/
+package-lock.json
