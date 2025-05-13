@@ -14,6 +14,15 @@ import Link from "next/link"
 import { useParams } from "next/navigation"
 import { supabase } from "@/lib/supabase"
 import { VaultInfo } from "@/lib/types"
+import { useSolanaWallets } from "@privy-io/react-auth"
+import { connection, useVoltrClientStore } from "@/components/hooks/useVoltrClientStore"
+import { BN } from "@coral-xyz/anchor"
+import { ComputeBudgetProgram, PublicKey, Transaction, TransactionInstruction, TransactionMessage, VersionedTransaction } from "@solana/web3.js"
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import {
+    getAssociatedTokenAddress,
+    createAssociatedTokenAccountInstruction,
+} from "@solana/spl-token";
 
 export default function CryptoDashboard() {
     const [depositAmount, setDepositAmount] = useState("")
@@ -23,8 +32,9 @@ export default function CryptoDashboard() {
     const [vaultData, setVaultData] = useState<VaultInfo>();
     const [userVaultData, setUserVaultData] = useState<any>(null)
     const [lendingpoolname, setlendingpoolname] = useState<any>();
-
-    const [loading, setLoading] = useState(true)
+    const { wallets } = useSolanaWallets();
+    const [loading, setLoading] = useState(true);
+    const client = useVoltrClientStore((state) => state.client);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -64,9 +74,56 @@ export default function CryptoDashboard() {
         fetchData()
     }, [vaultid, poolid]);
 
-    console.log(vaultData, userVaultData, lendingpoolname);
+    async function handeldeposit() {
+        try {
+            if (!client || !wallets[0] || !vaultData?.address || !connection) {
+                throw new Error("Missing required data");
+            }
 
-    console.log("pool id ", poolid, "vault id", vaultid);
+            const depositIx = await client.createDepositVaultIx(
+                new BN(depositAmount), // make sure this amount is in correct decimals
+                {
+                    userTransferAuthority: new PublicKey(wallets[0].address),
+                    vaultAssetMint: new PublicKey("EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"),
+                    vault: new PublicKey(vaultData.address),
+                    assetTokenProgram: TOKEN_PROGRAM_ID,
+                }
+            );
+
+            const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({
+                units: 400000,
+            });
+
+            const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+
+            const messageV0 = new TransactionMessage({
+                payerKey: new PublicKey(wallets[0].address),
+                recentBlockhash: blockhash,
+                instructions: [modifyComputeUnits, depositIx],
+            }).compileToV0Message();
+
+            const transaction = new VersionedTransaction(messageV0);
+
+            const txSig = await wallets[0].sendTransaction(transaction, connection, {
+                minContextSlot: await connection.getSlot(),
+            });
+
+            console.log("Transaction Signature:", txSig);
+
+            await connection.confirmTransaction(
+                {
+                    signature: txSig,
+                    blockhash,
+                    lastValidBlockHeight,
+                },
+                "confirmed"
+            );
+
+            console.log("Deposit successful!");
+        } catch (error) {
+            console.error("Deposit failed:", error);
+        }
+    }
 
     // Vault allocation data
     const COLORS = ["#f43f5e", "#8b5cf6", "#22d3ee", "#34d399", "#facc15", "#fb923c"];
@@ -340,10 +397,15 @@ export default function CryptoDashboard() {
                                             </div>
                                         </div>
 
-
-                                        <Button className="w-full h-12 bg-white text-black hover:bg-slate-200 hover:text-black cursor-pointer shadow-lg shadow-blue-700/20">
-                                            Connect Wallet to Deposit
-                                        </Button>
+                                        {wallets ?
+                                            <Button onClick={handeldeposit} className="w-full h-12 bg-white text-black hover:bg-slate-200 hover:text-black cursor-pointer shadow-lg shadow-blue-700/20">
+                                                Deposit Now
+                                            </Button>
+                                            :
+                                            <Button className="w-full h-12 bg-white text-black hover:bg-slate-200 hover:text-black cursor-pointer shadow-lg shadow-blue-700/20">
+                                                Connect Wallet To Deposit
+                                            </Button>
+                                        }
                                     </TabsContent>
 
                                     <TabsContent value="withdraw" className="space-y-4 mt-4">

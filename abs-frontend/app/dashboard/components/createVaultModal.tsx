@@ -17,7 +17,6 @@ import {  ComputeBudgetProgram, Keypair, PublicKey, TransactionConfirmationStrat
 import {  connection, useVoltrClientStore } from "@/components/hooks/useVoltrClientStore"
 import { useSolanaWallets, usePrivy } from "@privy-io/react-auth"
 import { supabase } from "@/lib/supabase"
-import { useSendTransaction } from "@privy-io/react-auth/solana"
 
 interface CreateVaultModalProps {
   isOpen: boolean
@@ -46,8 +45,6 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
   const [vaultDescription, setVaultDescription] = useState<string>("")
   const [initialDeposit, setInitialDeposit] = useState<string>("")
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const { sendTransaction } = useSendTransaction();
-
   const [allocations, setAllocations] = useState<AllocationItem[]>([
     {
       id: "1",
@@ -77,7 +74,6 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
 
   const { user, ready, authenticated } = usePrivy();
   const { wallets } = useSolanaWallets();
-  const { sendTransaction: privySendTransaction } = useSendTransaction();
   const [isWalletReady, setIsWalletReady] = useState(false);
   const [currentWallet, setCurrentWallet] = useState<any>(null);
 
