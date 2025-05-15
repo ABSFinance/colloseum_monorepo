@@ -2,7 +2,7 @@
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { useConnectWallet, useSolanaWallets } from "@privy-io/react-auth";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 export default function Header() {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -11,6 +11,15 @@ export default function Header() {
   const wallet = wallets[0];
   const [shouldLogin, setShouldLogin] = useState(false);
   const [hasSignedBefore, setHasSignedBefore] = useState(false);
+
+  const handleConnect = useCallback(async () => {
+    try {
+      await connectWallet();
+      setShouldLogin(true);
+    } catch (error) {
+      console.error("Wallet connection failed:", error);
+    }
+  }, [connectWallet]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -26,16 +35,7 @@ export default function Header() {
       console.log("Auto-connecting wallet for returning user");
       handleConnect();
     }
-  }, [hasSignedBefore, ready]);
-
-  const handleConnect = async () => {
-    try {
-      await connectWallet();
-      setShouldLogin(true);
-    } catch (error) {
-      console.error("Wallet connection failed:", error);
-    }
-  };
+  }, [hasSignedBefore, ready, walletAddress, shouldLogin, handleConnect]);
 
   useEffect(() => {
     if (!ready || wallets.length === 0 || !shouldLogin) return;

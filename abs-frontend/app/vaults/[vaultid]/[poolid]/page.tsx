@@ -40,8 +40,8 @@ export default function CryptoDashboard() {
     poolid: string;
   };
   const [vaultData, setVaultData] = useState<VaultInfo>();
-  const [userVaultData, setUserVaultData] = useState<any>(null);
-  const [lendingpoolname, setlendingpoolname] = useState<any>();
+  const [userVaultData, setUserVaultData] = useState<any[]>([]);
+  const [lendingpoolname, setlendingpoolname] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
 
@@ -92,43 +92,26 @@ export default function CryptoDashboard() {
   console.log("pool id ", poolid, "vault id", vaultid);
 
   // Vault allocation data
-  const COLORS = [
-    "#f43f5e",
-    "#8b5cf6",
-    "#22d3ee",
-    "#34d399",
-    "#facc15",
-    "#fb923c",
-  ];
   const allocationData = useMemo(() => {
-    const vaultData = userVaultData ?? [];
-    const lendingData = lendingpoolname ?? [];
+    const COLORS = [
+      "#f43f5e",
+      "#8b5cf6",
+      "#22d3ee",
+      "#34d399",
+      "#facc15",
+      "#fb923c",
+    ];
 
-    if (vaultData.length === 0 || lendingData.length === 0) {
-      return [
-        {
-          name: "No Allocation",
-          value: NaN,
-          color: "#fff",
-        },
-      ];
-    }
+    if (!userVaultData || userVaultData.length === 0) return [];
 
-    const total = vaultData.reduce((sum, item) => sum + item.amount, 0);
+    const total = userVaultData.reduce(
+      (sum: number, item: any) => sum + item.amount,
+      0
+    );
 
-    if (total === 0) {
-      return [
-        {
-          name: "No Allocation",
-          value: NaN,
-          color: "#fff",
-        },
-      ];
-    }
-
-    return vaultData.map((item, index) => {
-      const poolInfo = lendingData.find(
-        (p) => p.pool_id === item.allocated_pool_id
+    return userVaultData.map((item: any, index: number) => {
+      const poolInfo = lendingpoolname.find(
+        (p: any) => p.pool_id === item.allocated_pool_id
       );
       const poolName = poolInfo?.name || `Pool ${item.allocated_pool_id}`;
 
@@ -316,7 +299,7 @@ export default function CryptoDashboard() {
                           strokeWidth={2}
                           stroke="#18181b"
                         >
-                          {allocationData.map((entry, index) => (
+                          {allocationData.map((entry: any, index: number) => (
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
@@ -333,7 +316,7 @@ export default function CryptoDashboard() {
                     </ResponsiveContainer>
                   </div>
                   <div className="w-full md:w-1/2 grid grid-cols-2 gap-3">
-                    {allocationData.map((item, index) => (
+                    {allocationData.map((item: any, index: number) => (
                       <div key={index} className="flex items-center gap-2">
                         <div
                           className="w-5 h-5 rounded-sm"

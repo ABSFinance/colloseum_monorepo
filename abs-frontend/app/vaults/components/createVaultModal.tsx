@@ -229,7 +229,7 @@ export function CreateVaultModal({ isOpen, onClose }: CreateVaultModalProps) {
     console.log("Current wallet address:", currentWallet.address);
 
     const vaultKeypair = Keypair.generate();
-    let payer = new PublicKey(currentWallet.address);
+    const payer = new PublicKey(currentWallet.address);
 
     try {
       const createInitializeVaultIx = await client?.createInitializeVaultIx(
