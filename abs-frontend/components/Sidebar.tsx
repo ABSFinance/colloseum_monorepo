@@ -6,6 +6,8 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
+// TODO: add sidebar for vaults
+
 export default function Sidebar() {
   const pathname = usePathname();
 
@@ -28,7 +30,7 @@ export default function Sidebar() {
               src="/logo_name.png"
               alt="ABS Finance Logo"
               width={130}
-              height={50}
+              height={51}
               className="object-contain"
               priority
             />
