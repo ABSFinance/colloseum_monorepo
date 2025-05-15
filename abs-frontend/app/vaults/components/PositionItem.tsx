@@ -1,18 +1,25 @@
-"use client"
+"use client";
 
-import { motion } from "framer-motion"
-import type { ReactNode } from "react"
+import { motion } from "framer-motion";
+import type { ReactNode } from "react";
 
 interface PositionItemProps {
-  id: number
-  name: string
-  value: string
-  change: string
-  isPositive: boolean
-  icon: ReactNode
+  id: number;
+  name: string;
+  value: string;
+  change: string;
+  isPositive: boolean;
+  icon: ReactNode;
 }
 
-export function PositionItem({ id, name, value, change, isPositive, icon }: PositionItemProps) {
+export function PositionItem({
+  id,
+  name,
+  value,
+  change,
+  isPositive,
+  icon,
+}: PositionItemProps) {
   return (
     <motion.li
       key={id}
@@ -36,8 +43,10 @@ export function PositionItem({ id, name, value, change, isPositive, icon }: Posi
       </div>
       <div className="flex items-center">
         <span className="mr-4 font-medium">{value}</span>
-        <span className={isPositive ? "text-green-400" : "text-red-400"}>{change}</span>
+        <span className={isPositive ? "text-green-400" : "text-red-400"}>
+          {change}
+        </span>
       </div>
     </motion.li>
-  )
+  );
 }
