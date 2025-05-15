@@ -6,6 +6,8 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
+// TODO: add sidebar for vaults
+
 export default function Sidebar() {
   const pathname = usePathname();
 
