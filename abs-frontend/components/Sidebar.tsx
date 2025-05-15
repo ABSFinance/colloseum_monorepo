@@ -30,7 +30,7 @@ export default function Sidebar() {
               src="/logo_name.png"
               alt="ABS Finance Logo"
               width={130}
-              height={50}
+              height={51}
               className="object-contain"
               priority
             />
